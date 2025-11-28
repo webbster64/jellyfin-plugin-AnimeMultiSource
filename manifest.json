@@ -7,7 +7,7 @@
     "targetAbi": "10.11.2.0",
     "framework": "net9.0",
     "description": "Multi-source anime metadata (AniList, AniDB, MAL/Jikan, TVDB, Fanart.tv, Fribb, .plexmatch) with cautious rate limits and persistent caching.",
-    "category": "Metadata",
+    "category": "Anime",
     "imageUrl": "https://raw.githubusercontent.com/webbster64/jellyfin-plugin-AnimeMultiSource/main/media/logo.png",
     "owner": "webbster64",
     "overview": "Anime metadata, tags, art, and people pulled from multiple sources with rate limiting and 5-day persistent caches.",
