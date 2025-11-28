@@ -15,7 +15,19 @@ Remote anime metadata, tags, artwork and people for Jellyfin using multiple sour
   - Fanart.tv personal API key
   - AniDB client name/version (for tags)
 
-## Installation (build from source)
+## Installation
+**Option 1: Plugin repository (recommended)**
+1) Jellyfin Dashboard → Plugins → Repositories.
+2) Add repository: Name `AnimeMultiSource`, URL `https://raw.githubusercontent.com/webbster64/jellyfin-plugin-AnimeMultiSource/main/manifest.json`.
+3) Go to Catalog, find **Anime Multi Source**, click Install.
+4) Restart Jellyfin (then hard refresh browser: Ctrl+Shift+R / Cmd+Shift+R).
+
+**Option 2: Manual install from release**
+1) Download the latest `AnimeMultiSource_v*.zip` from the [releases](https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases).
+2) Extract into your Jellyfin `plugins/AnimeMultiSource/` folder.
+3) Restart Jellyfin.
+
+**Option 3: Build from source**
 1) `dotnet build` (or `dotnet publish -c Release`) in the repo root.
 2) Copy the contents of `Jellyfin.Plugin.AnimeMultiSource/bin/<Configuration>/net9.0/` into your Jellyfin `plugins/AnimeMultiSource/` folder.
 3) Restart Jellyfin.
