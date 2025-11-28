@@ -2,7 +2,7 @@
 name: "AnimeMultiSource"
 guid: "8eca6f17-71fe-4309-a670-3cae083f22bd"
 version: "1.0.0.0"
-targetAbi: "10.9.0.0"
+targetAbi: "10.11.2.0"
 framework: "net9.0"
 overview: "a attempt at a better Metadata plugin for anime"
 description: >
@@ -14,4 +14,4 @@ owner: "Webbster64"
 artifacts:
 - "Jellyfin.Plugin.AnimeMultiSource.dll"
 changelog: >
-  changelog
+  Initial 1.0.0.0 release targeting Jellyfin 10.11.2 ABI

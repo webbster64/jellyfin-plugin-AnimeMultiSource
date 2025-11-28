@@ -10,7 +10,7 @@ Remote anime metadata, tags, artwork and people for Jellyfin using multiple sour
 - Persistent caches: AniDB and AniList responses cached up to 5 days and persisted to disk to survive restarts.
 
 ## Requirements
-- Jellyfin 10.8+ (net9.0 plugin)
+- Jellyfin 10.11.2+ (net9.0 plugin, ABI 10.11.2.0)
 - API keys (optional but recommended):
   - Fanart.tv personal API key
   - AniDB client name/version (for tags)
