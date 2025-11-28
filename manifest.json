@@ -13,7 +13,7 @@
         "changelog": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases/tag/v1.0.0.0",
         "targetAbi": "10.11.2.0",
         "sourceUrl": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases/download/v1.0.0.0/AnimeMultiSource_v1.0.0.0.zip",
-        "checksum": "09B4BF30666B5D711EE2E59993F6B323",
+        "checksum": "D6425E5C0AA8BC0830A37273ABE50486",
         "timestamp": "2025-11-28T14:46:11Z"
       }
     ]
