@@ -1,0 +1,252 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>AnimeMultiSource</title>
+</head>
+<body>
+    <div id="AnimeMultiSourceConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-textarea">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="AnimeMultiSourceConfigurationForm">
+
+                    <!-- Title Configuration -->
+                    <h2>Title Configuration</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="titleField">Title Field</label>
+                        <select is="emby-select" id="titleField" name="titleField" class="emby-select-withcolor emby-select">
+                            <option value="Title">Title</option>
+                            <option value="TitleEnglish">English Title</option>
+                            <option value="TitleJapanese">Japanese Title</option>
+                        </select>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="titleDataSource">Title Data Source</label>
+                        <select is="emby-select" id="titleDataSource" name="titleDataSource" class="emby-select-withcolor emby-select">
+                            <option value="AniDB">AniDB</option>
+                            <option value="Anilist">Anilist</option>
+                            <option value="AniSearch">AniSearch</option>
+                            <option value="Kitsu">Kitsu</option>
+                            <option value="Jikan">Jikan</option>
+                        </select>
+                    </div>
+
+                    <!-- Original Title Configuration -->
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="originalTitleField">Original Title Field</label>
+                        <select is="emby-select" id="originalTitleField" name="originalTitleField" class="emby-select-withcolor emby-select">
+                            <option value="Title">Title</option>
+                            <option value="TitleJapanese">Japanese Title</option>
+                        </select>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="originalTitleDataSource">Original Title Data Source</label>
+                        <select is="emby-select" id="originalTitleDataSource" name="originalTitleDataSource" class="emby-select-withcolor emby-select">
+                            <option value="AniDB">AniDB</option>
+                            <option value="Anilist">Anilist</option>
+                            <option value="AniSearch">AniSearch</option>
+                            <option value="Kitsu">Kitsu</option>
+                            <option value="Jikan">Jikan</option>
+                        </select>
+                    </div>
+
+                    <!-- Runtime Configuration -->
+                    <h2>Runtime Configuration</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="runtimeDataSource">Runtime Data Source</label>
+                        <select is="emby-select" id="runtimeDataSource" name="runtimeDataSource" class="emby-select-withcolor emby-select">
+                            <option value="Anilist">Anilist</option>
+                            <option value="Jikan">Jikan</option>
+                        </select>
+                        <div class="fieldDescription">Anilist provides duration in minutes. Jikan provides duration as string (e.g., "24 min").</div>
+                    </div>
+
+                    <!-- Season Configuration -->
+                    <h2>Season Configuration</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="seasonTitleFormat">Season Title Format</label>
+                        <select is="emby-select" id="seasonTitleFormat" name="seasonTitleFormat" class="emby-select-withcolor emby-select">
+                            <option value="MetadataTitle">Use Season Name from Metadata</option>
+                            <option value="Numbered">Season {number}</option>
+                        </select>
+                        <div class="fieldDescription">Choose between the discovered season name (e.g., Samurai Bride) or a numbered title.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="seasonOverviewSource">Season Overview Source</label>
+                        <select is="emby-select" id="seasonOverviewSource" name="seasonOverviewSource" class="emby-select-withcolor emby-select">
+                            <option value="PreferJikan">Prefer MAL (Jikan), fallback to AniList</option>
+                            <option value="Jikan">MAL (Jikan) only</option>
+                            <option value="Anilist">AniList only</option>
+                        </select>
+                        <div class="fieldDescription">Use MAL/Jikan for richer season descriptions when available.</div>
+                    </div>
+
+                    <!-- Fanart.tv -->
+                    <h2>Fanart.tv Artwork</h2>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="personalApiKey">Personal API Key</label>
+                        <input id="personalApiKey" name="personalApiKey" type="text" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription">Personal API key improves freshness of Fanart.tv images.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="fanartMaxBackdrops">Max Backdrops (0 = all)</label>
+                        <input id="fanartMaxBackdrops" name="fanartMaxBackdrops" type="number" min="0" is="emby-input" />
+                        <div class="fieldDescription">Limits how many Fanart.tv backdrops are imported.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="backdropMinWidth">Backdrop Min Width</label>
+                        <input id="backdropMinWidth" name="backdropMinWidth" type="number" min="0" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="backdropMinHeight">Backdrop Min Height</label>
+                        <input id="backdropMinHeight" name="backdropMinHeight" type="number" min="0" is="emby-input" />
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="backdropAspectPreset">Backdrop Aspect Ratio</label>
+                        <select is="emby-select" id="backdropAspectPreset" name="backdropAspectPreset" class="emby-select-withcolor emby-select">
+                            <option value="none">No aspect filter</option>
+                            <option value="16x9">16:9</option>
+                            <option value="21x9">21:9</option>
+                            <option value="4x3">4:3</option>
+                        </select>
+                        <div class="fieldDescription">Choose an aspect ratio filter for backdrops.</div>
+                    </div>
+
+                    <!-- Content Configuration -->
+                    <h2>Content Configuration</h2>
+                    <div class="textareaContainer">
+                        <label class="textareaLabel" for="approvedGenres">Approved Genres List</label>
+                        <textarea id="approvedGenres" name="approvedGenres" is="emby-textarea" class="emby-textarea" rows="5" placeholder="Enter one genre per line. Only these genres will be kept."></textarea>
+                        <div class="fieldDescription">Prefilled with a curated list; one genre per line. Genres from Jikan (themes+genres+explicit_genres+demographics) and Anilist will be combined and filtered by this list.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="chkAniDbRateLimit">AniDB Rate Limit</label>
+                        <input id="chkAniDbRateLimit" name="chkAniDbRateLimit" type="number" is="emby-input" min="0" />
+                        <div class="fieldDescription">This will prevent IP bans for requesting data too quickly.</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var AnimeMultiSourceConfigurationPage = {
+                pluginUniqueId: "8eca6f17-71fe-4309-a670-3cae083f22bd",
+                aspectPresets: {
+                    none: 0,
+                    "16x9": 1.78,
+                    "21x9": 2.33,
+                    "4x3": 1.33
+                },
+
+                getAspectPreset: function (value) {
+                    var presets = AnimeMultiSourceConfigurationPage.aspectPresets;
+                    var closest = 'none';
+                    var minDiff = Number.MAX_VALUE;
+                    Object.keys(presets).forEach(function (key) {
+                        var diff = Math.abs((presets[key] || 0) - (value || 0));
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = key;
+                        }
+                    });
+                    return closest;
+                },
+
+                aspectPresetToValue: function (preset) {
+                    var presets = AnimeMultiSourceConfigurationPage.aspectPresets;
+                    return presets[preset] || 0;
+                },
+
+                loadConfiguration: function () {
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId).then(function (config) {
+                        // Title settings
+                        document.getElementById('titleField').value = config.TitleField || 'Title';
+                        document.getElementById('titleDataSource').value = config.TitleDataSource || 'AniDB';
+
+                        document.getElementById('originalTitleField').value = config.OriginalTitleField || 'TitleJapanese';
+                        document.getElementById('originalTitleDataSource').value = config.OriginalTitleDataSource || 'AniDB';
+
+                        // Runtime
+                        document.getElementById('runtimeDataSource').value = config.RuntimeDataSource || 'Anilist';
+
+                        // Season
+                        document.getElementById('seasonTitleFormat').value = config.SeasonTitleFormat || 'MetadataTitle';
+                        document.getElementById('seasonOverviewSource').value = config.SeasonOverviewSource || 'PreferJikan';
+
+                        // Fanart.tv
+                        document.getElementById('personalApiKey').value = config.PersonalApiKey || '';
+                        document.getElementById('fanartMaxBackdrops').value = config.FanartMaxBackdrops || 0;
+                        document.getElementById('backdropMinWidth').value = config.BackdropMinWidth || 0;
+                        document.getElementById('backdropMinHeight').value = config.BackdropMinHeight || 0;
+                        document.getElementById('backdropAspectPreset').value = AnimeMultiSourceConfigurationPage.getAspectPreset(config.BackdropMinAspectRatio);
+
+                        // Genres
+                        document.getElementById('approvedGenres').value = config.ApprovedGenres || '';
+
+                        // Limits
+                        document.getElementById('chkAniDbRateLimit').value = config.AniDbRateLimit;
+
+                        Dashboard.hideLoadingMsg();
+                    });
+                },
+
+                saveConfiguration: function () {
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId).then(function (config) {
+                        // Title settings
+                        config.TitleField = document.getElementById('titleField').value;
+                        config.TitleDataSource = document.getElementById('titleDataSource').value;
+
+                        config.OriginalTitleField = document.getElementById('originalTitleField').value;
+                        config.OriginalTitleDataSource = document.getElementById('originalTitleDataSource').value;
+
+                        // Runtime
+                        config.RuntimeDataSource = document.getElementById('runtimeDataSource').value;
+
+                        // Season
+                        config.SeasonTitleFormat = document.getElementById('seasonTitleFormat').value;
+                        config.SeasonOverviewSource = document.getElementById('seasonOverviewSource').value;
+
+                        // Fanart.tv
+                        config.PersonalApiKey = document.getElementById('personalApiKey').value;
+                        config.FanartMaxBackdrops = parseInt(document.getElementById('fanartMaxBackdrops').value || '0');
+                        config.BackdropMinWidth = parseInt(document.getElementById('backdropMinWidth').value || '0');
+                        config.BackdropMinHeight = parseInt(document.getElementById('backdropMinHeight').value || '0');
+                        config.BackdropMinAspectRatio = AnimeMultiSourceConfigurationPage.aspectPresetToValue(document.getElementById('backdropAspectPreset').value);
+
+                        // Genres
+                        config.ApprovedGenres = document.getElementById('approvedGenres').value;
+
+                        // Limits
+                        config.AniDbRateLimit = document.getElementById('chkAniDbRateLimit').value;
+
+                        ApiClient.updatePluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                },
+            };
+
+            document.getElementById('AnimeMultiSourceConfigurationPage').addEventListener('pageshow', function () {
+                AnimeMultiSourceConfigurationPage.loadConfiguration();
+            });
+
+            document.getElementById('AnimeMultiSourceConfigurationForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                AnimeMultiSourceConfigurationPage.saveConfiguration();
+            });
+        </script>
+    </div>
+</body>
+</html>

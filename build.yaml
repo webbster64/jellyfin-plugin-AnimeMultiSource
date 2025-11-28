@@ -1,0 +1,17 @@
+---
+name: "AnimeMultiSource"
+guid: "8eca6f17-71fe-4309-a670-3cae083f22bd"
+version: "1.0.0.0"
+targetAbi: "10.9.0.0"
+framework: "net9.0"
+overview: "a attempt at a better Metadata plugin for anime"
+description: >
+  a attempt at a better Metadata plugin for anime using data from Multiple Source and combining it into one
+  using data from Multiple Source and combining it into one.
+  Data from Anilist, AniDB, Mal 
+category: "Metadata"
+owner: "Webbster64"
+artifacts:
+- "Jellyfin.Plugin.AnimeMultiSource.dll"
+changelog: >
+  changelog
