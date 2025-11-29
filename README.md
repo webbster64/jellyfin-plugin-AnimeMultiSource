@@ -15,6 +15,11 @@ Remote anime metadata, tags, artwork and people for Jellyfin using multiple sour
   - Fanart.tv personal API key
   - AniDB client name/version (for tags)
 
+### .plexmatch files (strongly recommended)
+- The plugin honors `.plexmatch` files to improve ID resolution (title/year/TVDB/IMDb overrides). These files prevent mis-matches on tricky titles, remasters, and specials.
+- Sonarr can generate `.plexmatch` automatically: go to **Settings → Metadata**, enable **Plex**, and tick the option to write `.plexmatch` files.
+- If you already have `.plexmatch` files in your library, keep them alongside the series folders—no further setup needed.
+
 ## Installation
 **Option 1: Plugin repository (recommended)**
 1) Jellyfin Dashboard → Plugins → Repositories.
