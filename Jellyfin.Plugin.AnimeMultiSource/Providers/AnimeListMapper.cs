@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 {
@@ -47,19 +48,19 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 _mappingsByTvdb = mappings?
                     .Where(x => x.thetvdb_id.HasValue)
                     .GroupBy(x => x.thetvdb_id.GetValueOrDefault().ToString())
-                    .ToDictionary(g => g.Key, g => g.First()) // Take first occurrence for duplicates
+                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g)) // Prefer TV over OVA/OVA specials for duplicates
                     ?? new Dictionary<string, AnimeMapping>();
 
                 _mappingsByImdb = mappings?
                     .Where(x => !string.IsNullOrEmpty(x.imdb_id))
                     .GroupBy(x => x.imdb_id!)
-                    .ToDictionary(g => g.Key, g => g.First()) // Take first occurrence for duplicates
+                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g))
                     ?? new Dictionary<string, AnimeMapping>();
 
                 _mappingsByAniList = mappings?
                     .Where(x => x.anilist_id.HasValue)
                     .GroupBy(x => x.anilist_id!.Value)
-                    .ToDictionary(g => g.Key, g => g.First())
+                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g))
                     ?? new Dictionary<long, AnimeMapping>();
 
                 _lastUpdated = DateTime.UtcNow;
@@ -86,6 +87,36 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public AnimeMapping? GetMappingByAniListId(long aniListId)
         {
             return _mappingsByAniList.TryGetValue(aniListId, out var mapping) ? mapping : null;
+        }
+
+        private AnimeMapping SelectPreferredMapping(IEnumerable<AnimeMapping> group)
+        {
+            return group
+                .OrderBy(m => GetTypePriority(m.type))
+                .ThenBy(m => m.anilist_id ?? long.MaxValue) // deterministic fallback
+                .First();
+        }
+
+        private int GetTypePriority(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+            {
+                return 1; // slightly below explicit TV
+            }
+
+            var normalized = type.Trim().ToUpperInvariant();
+
+            // Prefer TV series mappings over OVA specials when IDs collide.
+            return normalized switch
+            {
+                "TV" => 0,
+                "TV SERIES" => 0,
+                "ONA" => 2,
+                "SPECIAL" => 3,
+                "MOVIE" => 4,
+                "OVA" => 5,
+                _ => 6
+            };
         }
     }
 

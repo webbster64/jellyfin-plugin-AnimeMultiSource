@@ -1,7 +1,7 @@
 ---
 name: "AnimeMultiSource"
 guid: "8eca6f17-71fe-4309-a670-3cae083f22bd"
-version: "1.0.1.0"
+version: "1.0.1.1"
 targetAbi: "10.11.2.0"
 framework: "net9.0"
 overview: "a attempt at a better Metadata plugin for anime"
@@ -14,4 +14,4 @@ owner: "Webbster64"
 artifacts:
 - "Jellyfin.Plugin.AnimeMultiSource.dll"
 changelog: >
-  Adds TVDB poster/banner/logo/clearart fallback when Fanart.tv is empty and fixes TVDB backdrop type handling.
+  Prefers TV mappings over OVA duplicates in Fribb mapping data to avoid mis-linking series like Future Diary.
