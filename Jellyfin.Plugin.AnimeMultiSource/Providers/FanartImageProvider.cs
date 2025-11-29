@@ -59,7 +59,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
         {
-            _logger.LogInformation("{Provider} v0.0.1.3 GetImages for {Name} ({ItemType})", Name, item.Name, item.GetType().Name);
+            var version = typeof(FanartImageProvider).Assembly.GetName().Version?.ToString() ?? "unknown";
+            _logger.LogInformation("{Provider} v{Version} GetImages for {Name} ({ItemType})", Name, version, item.Name, item.GetType().Name);
 
             var tvdbId = GetTvdbId(item);
             if (string.IsNullOrWhiteSpace(tvdbId))
@@ -77,6 +78,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     _logger.LogInformation("Season image lookup skipped: no season number for {Name} (TVDB {TvdbId})", item.Name, tvdbId);
                 }
             }
+
+            TvdbSeriesExtended? tvdbSeries = null;
+            int? tvdbSeriesId = null;
+            if (int.TryParse(tvdbId, out var parsedSeriesId))
+            {
+                tvdbSeriesId = parsedSeriesId;
+                tvdbSeries = await _tvdbClient.GetSeriesExtendedAsync(parsedSeriesId, cancellationToken);
+            }
             FanartTvResponse? fanart = null;
             if (!string.IsNullOrWhiteSpace(_config.PersonalApiKey))
             {
@@ -88,13 +97,32 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             // Series-level images
             if (item is Series)
             {
+                var seriesImages = new List<RemoteImageInfo>();
+
                 if (fanart != null)
                 {
-                    images.AddRange(ToImageInfos(fanart.TvPosters, ImageType.Primary));
-                    images.AddRange(ToImageInfos(fanart.TvBanners, ImageType.Banner));
-                    images.AddRange(ToImageInfos(fanart.HdTvLogos.Any() ? fanart.HdTvLogos : fanart.ClearLogos, ImageType.Logo));
-                    images.AddRange(ToImageInfos(fanart.ClearArt, ImageType.Art));
-                    images.AddRange(ToImageInfos(fanart.TvThumbs, ImageType.Thumb));
+                    seriesImages.AddRange(ToImageInfos(fanart.TvPosters, ImageType.Primary));
+                    seriesImages.AddRange(ToImageInfos(fanart.TvBanners, ImageType.Banner));
+                    seriesImages.AddRange(ToImageInfos(fanart.HdTvLogos.Any() ? fanart.HdTvLogos : fanart.ClearLogos, ImageType.Logo));
+                    seriesImages.AddRange(ToImageInfos(fanart.ClearArt, ImageType.Art));
+                    seriesImages.AddRange(ToImageInfos(fanart.TvThumbs, ImageType.Thumb));
+                }
+
+                if (tvdbSeriesId.HasValue)
+                {
+                    var tvdbSeriesImages = GetTvdbSeriesImages(tvdbSeriesId.Value, tvdbSeries);
+                    if (tvdbSeriesImages.Count > 0)
+                    {
+                        _logger.LogInformation("Collected {Count} TVDB series images for {Name}", tvdbSeriesImages.Count, item.Name);
+                        seriesImages.AddRange(tvdbSeriesImages);
+                    }
+                }
+
+                if (seriesImages.Count > 0)
+                {
+                    images.AddRange(seriesImages
+                        .GroupBy(img => img.Url, StringComparer.OrdinalIgnoreCase)
+                        .Select(g => g.First()));
                 }
 
                 // Series backdrops with fallback to TVDB if needed
@@ -107,7 +135,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     ? FilterBackdrops(ToImageInfos(fanart.ShowBackgrounds, ImageType.Backdrop))
                     : new List<RemoteImageInfo>();
 
-                var tvdbBackdrops = (await GetTvdbBackdropsAsync(tvdbId, cancellationToken))
+                var tvdbBackdrops = GetTvdbBackdrops(tvdbSeriesId, tvdbSeries)
                     .OrderByDescending(b => b.CommunityRating ?? 0)
                     .ToList();
 
@@ -141,7 +169,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     displayOrder = "official";
                 }
                 _logger.LogInformation("Using display order '{DisplayOrder}' for season images on {Name}", displayOrder, item.Name);
-                seasonImages.AddRange(await GetTvdbSeasonImagesAsync(tvdbId, seasonNumber.Value, displayOrder!, cancellationToken));
+                seasonImages.AddRange(await GetTvdbSeasonImagesAsync(tvdbId, seasonNumber.Value, displayOrder!, cancellationToken, tvdbSeries));
 
                 // Fanart.tv as fallback
                 if (fanart != null)
@@ -221,17 +249,11 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return images.Where(i => string.Equals(i.Season, seasonStr, StringComparison.OrdinalIgnoreCase));
         }
 
-        private async Task<IEnumerable<RemoteImageInfo>> GetTvdbBackdropsAsync(string tvdbId, CancellationToken cancellationToken)
+        private List<RemoteImageInfo> GetTvdbBackdrops(int? seriesId, TvdbSeriesExtended? series)
         {
-            if (!int.TryParse(tvdbId, out var seriesId))
+            if (!seriesId.HasValue || series?.Artworks == null)
             {
-                return Array.Empty<RemoteImageInfo>();
-            }
-
-            var series = await _tvdbClient.GetSeriesExtendedAsync(seriesId, cancellationToken);
-            if (series?.Artworks == null)
-            {
-                return Array.Empty<RemoteImageInfo>();
+                return new List<RemoteImageInfo>();
             }
 
             var totalArtworks = series.Artworks.Count;
@@ -274,14 +296,69 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return backdrops;
         }
 
-        private async Task<IEnumerable<RemoteImageInfo>> GetTvdbSeasonImagesAsync(string tvdbId, int seasonNumber, string displayOrder, CancellationToken cancellationToken)
+        private List<RemoteImageInfo> GetTvdbSeriesImages(int seriesId, TvdbSeriesExtended? series)
+        {
+            if (series?.Artworks == null)
+            {
+                return new List<RemoteImageInfo>();
+            }
+
+            var list = new List<RemoteImageInfo>();
+
+            list.AddRange(series.Artworks.Where(a => a.Type == 2 && !string.IsNullOrWhiteSpace(a.Image)).Select(a => new RemoteImageInfo
+            {
+                ProviderName = Name,
+                Url = a.Image!,
+                Type = ImageType.Primary,
+                Width = a.Width,
+                Height = a.Height,
+                CommunityRating = ToRating(a.Score)
+            }));
+
+            list.AddRange(series.Artworks.Where(a => a.Type == 1 && !string.IsNullOrWhiteSpace(a.Image)).Select(a => new RemoteImageInfo
+            {
+                ProviderName = Name,
+                Url = a.Image!,
+                Type = ImageType.Banner,
+                Width = a.Width,
+                Height = a.Height,
+                CommunityRating = ToRating(a.Score)
+            }));
+
+            list.AddRange(series.Artworks.Where(a => a.Type == 23 && !string.IsNullOrWhiteSpace(a.Image)).Select(a => new RemoteImageInfo
+            {
+                ProviderName = Name,
+                Url = a.Image!,
+                Type = ImageType.Logo,
+                Width = a.Width,
+                Height = a.Height,
+                CommunityRating = ToRating(a.Score)
+            }));
+
+            list.AddRange(series.Artworks.Where(a => a.Type == 22 && !string.IsNullOrWhiteSpace(a.Image)).Select(a => new RemoteImageInfo
+            {
+                ProviderName = Name,
+                Url = a.Image!,
+                Type = ImageType.Art,
+                Width = a.Width,
+                Height = a.Height,
+                CommunityRating = ToRating(a.Score)
+            }));
+
+            _logger.LogInformation("TVDB series art for {SeriesId}: {PosterCount} posters, {BannerCount} banners, {LogoCount} logos, {ArtCount} clearart",
+                seriesId, list.Count(i => i.Type == ImageType.Primary), list.Count(i => i.Type == ImageType.Banner), list.Count(i => i.Type == ImageType.Logo), list.Count(i => i.Type == ImageType.Art));
+
+            return list;
+        }
+
+        private async Task<IEnumerable<RemoteImageInfo>> GetTvdbSeasonImagesAsync(string tvdbId, int seasonNumber, string displayOrder, CancellationToken cancellationToken, TvdbSeriesExtended? series = null)
         {
             if (!int.TryParse(tvdbId, out var seriesId))
             {
                 return Array.Empty<RemoteImageInfo>();
             }
 
-            var series = await _tvdbClient.GetSeriesExtendedAsync(seriesId, cancellationToken);
+            series ??= await _tvdbClient.GetSeriesExtendedAsync(seriesId, cancellationToken);
             if (series?.Artworks == null || series.Seasons == null)
             {
                 return Array.Empty<RemoteImageInfo>();
@@ -373,8 +450,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         private bool IsBackdropType(TvdbArtwork artwork)
         {
-            // TVDB artwork types: 2 = fanart, 3 = season/series background in many datasets.
-            return artwork.Type == 2 || artwork.Type == 3;
+            // TVDB artwork types: 3 = series/season background in the v4 API.
+            return artwork.Type == 3;
         }
 
         private List<RemoteImageInfo> FilterBackdrops(List<RemoteImageInfo> images)
