@@ -69,6 +69,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             var seasonName = GetSeasonName(seasonDetail, seasonNumber, info.Name);
+            var sortName = $"Season {seasonNumber:00}";
             var originalTitle = seasonDetail.TitleEnglish
                 ?? seasonDetail.TitleRomaji
                 ?? seasonDetail.TitleNative
@@ -95,6 +96,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             var season = new Season
             {
                 Name = seasonName,
+                SortName = sortName,
+                ForcedSortName = sortName,
                 OriginalTitle = originalTitle,
                 Overview = overview
             };

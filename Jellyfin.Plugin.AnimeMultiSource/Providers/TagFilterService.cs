@@ -58,6 +58,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "TV censoring",
             "wafuku -- TO BE SPLIT AND DELETED",
             "excessive censoring",
+            "preaired episodes",
             "maintenance tags"
         };
 
