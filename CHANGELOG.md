@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1.6 - 2025-12-18
+- Use cached AniDB tags even when AniDB is rate-limited.
+
 ## 1.0.1.5 - 2025-12-18
 - Fix season artwork lookups by prioritizing series TVDB IDs for seasons.
 

@@ -737,17 +737,17 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             EnsurePersistentCacheLoaded();
 
-            if (IsAniDbTemporarilyBanned(out var remainingBan, out var banReason))
-            {
-                _logger.LogWarning("AniDB requests paused until {BanUntil:u} (remaining {Remaining:F1} minutes) because {Reason}", now + remainingBan, remainingBan.TotalMinutes, banReason);
-                return new List<string>();
-            }
-
             if (_aniDbCache.TryGetValue(anidbId, out var cached) &&
                 now - cached.CachedAt < AniDbCacheDuration)
             {
                 _logger.LogInformation("AniDB cache hit for ID {AniDbId} (age: {Age:F1} minutes)", anidbId, (now - cached.CachedAt).TotalMinutes);
                 return new List<string>(cached.Tags);
+            }
+
+            if (IsAniDbTemporarilyBanned(out var remainingBan, out var banReason))
+            {
+                _logger.LogWarning("AniDB requests paused until {BanUntil:u} (remaining {Remaining:F1} minutes) because {Reason}", now + remainingBan, remainingBan.TotalMinutes, banReason);
+                return new List<string>();
             }
 
             _aniDbCache.TryRemove(anidbId, out _);
