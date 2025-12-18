@@ -4,6 +4,7 @@ using MediaBrowser.Common.Plugins;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AnimeMultiSource
 {
@@ -22,6 +23,24 @@ namespace Jellyfin.Plugin.AnimeMultiSource
         }
 
         public static Plugin? Instance { get; private set; }
+
+        public static Configuration.PluginConfiguration GetConfigurationSafe(ILogger logger)
+        {
+            if (Instance == null)
+            {
+                return new Configuration.PluginConfiguration();
+            }
+
+            try
+            {
+                return Instance.Configuration;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load plugin configuration; falling back to defaults.");
+                return new Configuration.PluginConfiguration();
+            }
+        }
 
         public IEnumerable<PluginPageInfo> GetPages()
         {

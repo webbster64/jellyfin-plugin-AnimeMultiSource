@@ -24,7 +24,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger)
         {
             _logger = logger;
-            _config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+            _config = Plugin.GetConfigurationSafe(_logger);
 
             var httpClientHandler = new HttpClientHandler
             {

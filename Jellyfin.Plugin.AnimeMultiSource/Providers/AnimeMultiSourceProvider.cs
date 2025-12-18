@@ -24,7 +24,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public AnimeMultiSourceProvider(ILogger<AnimeMultiSourceProvider> logger)
         {
             _logger = logger;
-            _config = Plugin.Instance?.Configuration ?? new Configuration.PluginConfiguration();
+            _config = Plugin.GetConfigurationSafe(_logger);
 
             // Create service with simplified dependency chain
             _animeService = new AnimeMultiSourceService(logger);

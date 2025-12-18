@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1.4 - 2025-12-18
+- Guard against configuration load failures during multi-version plugin updates.
+
 ## 1.0.1.3 - 2025-12-18
 - Fix external URL labels by splitting providers per service.
 - Ensure season sort title is always set and enforce sort ordering.

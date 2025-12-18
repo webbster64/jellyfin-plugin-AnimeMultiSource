@@ -32,7 +32,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public FanartImageProvider(ILogger<FanartImageProvider> logger)
         {
             _logger = logger;
-            _config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+            _config = Plugin.GetConfigurationSafe(_logger);
 
             var handler = new HttpClientHandler
             {
