@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1.3 - 2025-12-18
+- Fix external URL labels by splitting providers per service.
+- Ensure season sort title is always set and enforce sort ordering.
+- Set season index number for consistent season artwork lookups.
+- Add Fanart.tv language tagging, optional language override, and size probing.
+
 ## 1.0.1.1 - 2025-11-29
 - Prefer TV mappings over OVA duplicates in Fribb anime lists to avoid mis-linking (e.g., Future Diary now maps to the TV entry).
 

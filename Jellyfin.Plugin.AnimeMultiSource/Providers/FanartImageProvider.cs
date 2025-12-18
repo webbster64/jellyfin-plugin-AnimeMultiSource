@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -22,6 +24,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly FanartClient _fanartClient;
         private readonly TvdbApiClient _tvdbClient;
         private readonly PluginConfiguration _config;
+        private readonly HttpClient _httpClient;
+        private readonly HashSet<string> _fanartLanguageOverride;
+        private readonly bool _hasLanguageOverride;
+        private readonly ConcurrentDictionary<string, (int Width, int Height)> _fanartSizeCache = new(StringComparer.OrdinalIgnoreCase);
 
         public FanartImageProvider(ILogger<FanartImageProvider> logger)
         {
@@ -36,8 +42,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             var httpClient = new HttpClient(handler);
             httpClient.DefaultRequestHeaders.Add("User-Agent", "Jellyfin-AnimeMultiSource-Plugin/1.0");
 
+            _httpClient = httpClient;
             _fanartClient = new FanartClient(httpClient, logger, _config.PersonalApiKey ?? string.Empty);
             _tvdbClient = new TvdbApiClient(httpClient, logger, Constants.TvdbProjectApiKey);
+            _fanartLanguageOverride = ParseFanartLanguages(_config.FanartLanguages);
+            _hasLanguageOverride = !string.IsNullOrWhiteSpace(_config.FanartLanguages)
+                && !_config.FanartLanguages.Equals("all", StringComparison.OrdinalIgnoreCase)
+                && _fanartLanguageOverride.Count > 0;
         }
 
         public string Name => $"{Constants.PluginName} Fanart.tv";
@@ -101,11 +112,11 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 if (fanart != null)
                 {
-                    seriesImages.AddRange(ToImageInfos(fanart.TvPosters, ImageType.Primary));
-                    seriesImages.AddRange(ToImageInfos(fanart.TvBanners, ImageType.Banner));
-                    seriesImages.AddRange(ToImageInfos(fanart.HdTvLogos.Any() ? fanart.HdTvLogos : fanart.ClearLogos, ImageType.Logo));
-                    seriesImages.AddRange(ToImageInfos(fanart.ClearArt, ImageType.Art));
-                    seriesImages.AddRange(ToImageInfos(fanart.TvThumbs, ImageType.Thumb));
+                    seriesImages.AddRange(await ToImageInfosAsync(fanart.TvPosters, ImageType.Primary, cancellationToken));
+                    seriesImages.AddRange(await ToImageInfosAsync(fanart.TvBanners, ImageType.Banner, cancellationToken));
+                    seriesImages.AddRange(await ToImageInfosAsync(fanart.HdTvLogos.Any() ? fanart.HdTvLogos : fanart.ClearLogos, ImageType.Logo, cancellationToken));
+                    seriesImages.AddRange(await ToImageInfosAsync(fanart.ClearArt, ImageType.Art, cancellationToken));
+                    seriesImages.AddRange(await ToImageInfosAsync(fanart.TvThumbs, ImageType.Thumb, cancellationToken));
                 }
 
                 if (tvdbSeriesId.HasValue)
@@ -132,7 +143,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 _logger.LogInformation("{Message}", (object)targetLog);
 
                 var fanartBackdrops = fanart != null
-                    ? FilterBackdrops(ToImageInfos(fanart.ShowBackgrounds, ImageType.Backdrop))
+                    ? FilterBackdrops(await ToImageInfosAsync(fanart.ShowBackgrounds, ImageType.Backdrop, cancellationToken))
                     : new List<RemoteImageInfo>();
 
                 var tvdbBackdrops = GetTvdbBackdrops(tvdbSeriesId, tvdbSeries)
@@ -174,9 +185,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 // Fanart.tv as fallback
                 if (fanart != null)
                 {
-                    seasonImages.AddRange(ToImageInfos(FilterSeason(fanart.SeasonPosters, seasonNumber.Value), ImageType.Primary, seasonNumber.Value));
-                    seasonImages.AddRange(ToImageInfos(FilterSeason(fanart.SeasonBanners, seasonNumber.Value), ImageType.Banner, seasonNumber.Value));
-                    seasonImages.AddRange(ToImageInfos(FilterSeason(fanart.SeasonThumbs, seasonNumber.Value), ImageType.Thumb, seasonNumber.Value));
+                    seasonImages.AddRange(await ToImageInfosAsync(FilterSeason(fanart.SeasonPosters, seasonNumber.Value), ImageType.Primary, cancellationToken));
+                    seasonImages.AddRange(await ToImageInfosAsync(FilterSeason(fanart.SeasonBanners, seasonNumber.Value), ImageType.Banner, cancellationToken));
+                    seasonImages.AddRange(await ToImageInfosAsync(FilterSeason(fanart.SeasonThumbs, seasonNumber.Value), ImageType.Thumb, cancellationToken));
                 }
 
                 _logger.LogInformation("Season images collected for {Name} S{SeasonNumber}: {Count}", item.Name, seasonNumber, seasonImages.Count);
@@ -230,23 +241,215 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return null;
         }
 
-        private List<RemoteImageInfo> ToImageInfos(IEnumerable<FanartImage> source, ImageType type, int? seasonNumber = null)
+        private async Task<List<RemoteImageInfo>> ToImageInfosAsync(IEnumerable<FanartImage> source, ImageType type, CancellationToken cancellationToken)
         {
-            return source
-                .Where(img => !string.IsNullOrWhiteSpace(img.Url))
-                .Select(img => new RemoteImageInfo
+            var list = new List<RemoteImageInfo>();
+            foreach (var image in FilterByLanguage(source))
+            {
+                if (string.IsNullOrWhiteSpace(image.Url))
+                {
+                    continue;
+                }
+
+                var info = new RemoteImageInfo
                 {
                     ProviderName = Name,
-                    Url = img.Url!,
-                    Type = type
-                })
-                .ToList();
+                    Url = image.Url!,
+                    Type = type,
+                    Language = NormalizeLanguage(image.Language)
+                };
+
+                var size = await TryGetImageSizeAsync(image.Url!, cancellationToken);
+                if (size.HasValue)
+                {
+                    info.Width = size.Value.Width;
+                    info.Height = size.Value.Height;
+                }
+
+                list.Add(info);
+            }
+
+            return list;
         }
 
         private IEnumerable<FanartImage> FilterSeason(IEnumerable<FanartSeasonImage> images, int seasonNumber)
         {
             var seasonStr = seasonNumber.ToString();
             return images.Where(i => string.Equals(i.Season, seasonStr, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private IEnumerable<T> FilterByLanguage<T>(IEnumerable<T> images) where T : FanartImage
+        {
+            if (!_hasLanguageOverride)
+            {
+                return images;
+            }
+
+            return images.Where(img => IsLanguageMatch(img.Language));
+        }
+
+        private bool IsLanguageMatch(string? language)
+        {
+            var normalized = NormalizeLanguage(language);
+            return _fanartLanguageOverride.Contains(normalized);
+        }
+
+        private static string NormalizeLanguage(string? language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+            {
+                return "00";
+            }
+
+            return language.Trim();
+        }
+
+        private static HashSet<string> ParseFanartLanguages(string? configValue)
+        {
+            if (string.IsNullOrWhiteSpace(configValue))
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (string.Equals(configValue.Trim(), "all", StringComparison.OrdinalIgnoreCase))
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var parts = configValue
+                .Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => value.Trim())
+                .Where(value => value.Length > 0)
+                .Select(value => string.Equals(value, "none", StringComparison.OrdinalIgnoreCase) ? "00" : value);
+
+            return new HashSet<string>(parts, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async Task<(int Width, int Height)?> TryGetImageSizeAsync(string url, CancellationToken cancellationToken)
+        {
+            if (!_config.FanartProbeImageSize || string.IsNullOrWhiteSpace(url))
+            {
+                return null;
+            }
+
+            if (_fanartSizeCache.TryGetValue(url, out var cached))
+            {
+                return cached;
+            }
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Range = new RangeHeaderValue(0, 65535);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var buffer = new byte[65536];
+                var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+                if (read <= 0)
+                {
+                    return null;
+                }
+
+                if (TryReadPngSize(buffer, read, out var width, out var height) ||
+                    TryReadJpegSize(buffer, read, out width, out height))
+                {
+                    _fanartSizeCache.TryAdd(url, (width, height));
+                    return (width, height);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to probe Fanart.tv image size for {Url}", url);
+            }
+
+            return null;
+        }
+
+        private static bool TryReadPngSize(byte[] buffer, int length, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+
+            if (length < 24)
+            {
+                return false;
+            }
+
+            if (buffer[0] != 0x89 || buffer[1] != 0x50 || buffer[2] != 0x4E || buffer[3] != 0x47)
+            {
+                return false;
+            }
+
+            width = (buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19];
+            height = (buffer[20] << 24) | (buffer[21] << 16) | (buffer[22] << 8) | buffer[23];
+            return width > 0 && height > 0;
+        }
+
+        private static bool TryReadJpegSize(byte[] buffer, int length, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+
+            if (length < 4 || buffer[0] != 0xFF || buffer[1] != 0xD8)
+            {
+                return false;
+            }
+
+            var index = 2;
+            while (index + 1 < length)
+            {
+                if (buffer[index] != 0xFF)
+                {
+                    index++;
+                    continue;
+                }
+
+                var marker = buffer[index + 1];
+                if (marker == 0xD9 || marker == 0xDA)
+                {
+                    break;
+                }
+
+                if (index + 3 >= length)
+                {
+                    break;
+                }
+
+                var segmentLength = (buffer[index + 2] << 8) | buffer[index + 3];
+                if (segmentLength < 2)
+                {
+                    break;
+                }
+
+                if (IsJpegStartOfFrameMarker(marker))
+                {
+                    if (index + 8 >= length)
+                    {
+                        return false;
+                    }
+
+                    height = (buffer[index + 5] << 8) | buffer[index + 6];
+                    width = (buffer[index + 7] << 8) | buffer[index + 8];
+                    return width > 0 && height > 0;
+                }
+
+                index += 2 + segmentLength;
+            }
+
+            return false;
+        }
+
+        private static bool IsJpegStartOfFrameMarker(byte marker)
+        {
+            return marker == 0xC0 || marker == 0xC1 || marker == 0xC2 || marker == 0xC3
+                || marker == 0xC5 || marker == 0xC6 || marker == 0xC7
+                || marker == 0xC9 || marker == 0xCA || marker == 0xCB
+                || marker == 0xCD || marker == 0xCE || marker == 0xCF;
         }
 
         private List<RemoteImageInfo> GetTvdbBackdrops(int? seriesId, TvdbSeriesExtended? series)

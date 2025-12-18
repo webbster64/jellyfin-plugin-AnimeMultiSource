@@ -117,6 +117,8 @@ Action";
             // Fanart.tv
             FanartMaxBackdrops = 5;
             PersonalApiKey = string.Empty;
+            FanartLanguages = string.Empty;
+            FanartProbeImageSize = true;
             BackdropMinWidth = 1920;
             BackdropMinHeight = 1080;
             BackdropMinAspectRatio = 1.78;
@@ -150,6 +152,8 @@ Action";
         // Fanart.tv
         public string PersonalApiKey { get; set; }
         public int FanartMaxBackdrops { get; set; }
+        public string FanartLanguages { get; set; }
+        public bool FanartProbeImageSize { get; set; }
         public int BackdropMinWidth { get; set; }
         public int BackdropMinHeight { get; set; }
         public double BackdropMinAspectRatio { get; set; }

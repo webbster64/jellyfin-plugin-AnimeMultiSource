@@ -95,6 +95,18 @@
                         <div class="fieldDescription">Limits how many Fanart.tv backdrops are imported.</div>
                     </div>
                     <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="fanartLanguages">Artwork Languages</label>
+                        <input id="fanartLanguages" name="fanartLanguages" type="text" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription">Optional override for Fanart.tv. Leave blank to use Jellyfin's language selection. Comma-separated codes (e.g., "en,ja,00"); use "all" for no filter. "00" means no language.</div>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input id="fanartProbeImageSize" name="fanartProbeImageSize" type="checkbox" is="emby-checkbox" />
+                            <span>Probe Fanart.tv image size</span>
+                        </label>
+                        <div class="fieldDescription">Fetches image headers to populate width/height for Fanart.tv artwork.</div>
+                    </div>
+                    <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="backdropMinWidth">Backdrop Min Width</label>
                         <input id="backdropMinWidth" name="backdropMinWidth" type="number" min="0" is="emby-input" />
                     </div>
@@ -186,6 +198,8 @@
                         // Fanart.tv
                         document.getElementById('personalApiKey').value = config.PersonalApiKey || '';
                         document.getElementById('fanartMaxBackdrops').value = config.FanartMaxBackdrops || 0;
+                        document.getElementById('fanartLanguages').value = config.FanartLanguages || '';
+                        document.getElementById('fanartProbeImageSize').checked = config.FanartProbeImageSize !== false;
                         document.getElementById('backdropMinWidth').value = config.BackdropMinWidth || 0;
                         document.getElementById('backdropMinHeight').value = config.BackdropMinHeight || 0;
                         document.getElementById('backdropAspectPreset').value = AnimeMultiSourceConfigurationPage.getAspectPreset(config.BackdropMinAspectRatio);
@@ -221,6 +235,8 @@
                         // Fanart.tv
                         config.PersonalApiKey = document.getElementById('personalApiKey').value;
                         config.FanartMaxBackdrops = parseInt(document.getElementById('fanartMaxBackdrops').value || '0');
+                        config.FanartLanguages = document.getElementById('fanartLanguages').value;
+                        config.FanartProbeImageSize = document.getElementById('fanartProbeImageSize').checked;
                         config.BackdropMinWidth = parseInt(document.getElementById('backdropMinWidth').value || '0');
                         config.BackdropMinHeight = parseInt(document.getElementById('backdropMinHeight').value || '0');
                         config.BackdropMinAspectRatio = AnimeMultiSourceConfigurationPage.aspectPresetToValue(document.getElementById('backdropAspectPreset').value);

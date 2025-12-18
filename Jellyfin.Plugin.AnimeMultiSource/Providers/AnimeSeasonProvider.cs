@@ -99,7 +99,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 SortName = sortName,
                 ForcedSortName = sortName,
                 OriginalTitle = originalTitle,
-                Overview = overview
+                Overview = overview,
+                IndexNumber = seasonNumber
             };
 
             if (seasonDetail.StartDate.HasValue)
