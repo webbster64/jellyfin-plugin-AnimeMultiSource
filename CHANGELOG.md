@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2.0 - 2025-12-18
+- Set assembly version to match plugin version.
+- Use cached AniDB tags even when AniDB is rate-limited.
+
 ## 1.0.1.6 - 2025-12-18
 - Use cached AniDB tags even when AniDB is rate-limited.
 
