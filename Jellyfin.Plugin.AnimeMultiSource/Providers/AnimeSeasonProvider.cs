@@ -19,7 +19,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly ApiService _apiService;
         private readonly PlexMatchParser _plexMatchParser;
         private readonly AnimeListMapper _animeListMapper;
-        private readonly PluginConfiguration _config;
+        private PluginConfiguration _config;
 
         public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger)
         {
@@ -42,6 +42,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public async Task<MetadataResult<Season>> GetMetadata(SeasonInfo info, CancellationToken cancellationToken)
         {
             var result = new MetadataResult<Season>();
+            _config = Plugin.GetConfigurationSafe(_logger);
             _logger.LogInformation("=== SEASON PROVIDER CALL for: {SeasonName} (Season {SeasonNumber}, Path: {Path}) ===",
                 info.Name, info.IndexNumber, info.Path);
 

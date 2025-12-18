@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1.5 - 2025-12-18
+- Fix season artwork lookups by prioritizing series TVDB IDs for seasons.
+
 ## 1.0.1.4 - 2025-12-18
 - Guard against configuration load failures during multi-version plugin updates.
 

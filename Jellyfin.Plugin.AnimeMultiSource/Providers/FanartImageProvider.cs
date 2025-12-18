@@ -204,18 +204,17 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         private string? GetTvdbId(BaseItem item)
         {
-            var id = item.GetProviderId(MetadataProvider.Tvdb);
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                return id;
-            }
-
             if (item is Season season && season.Series != null)
             {
-                id = season.Series.GetProviderId(MetadataProvider.Tvdb);
+                var seriesId = season.Series.GetProviderId(MetadataProvider.Tvdb);
+                if (!string.IsNullOrWhiteSpace(seriesId))
+                {
+                    return seriesId;
+                }
             }
 
-            return id;
+            var id = item.GetProviderId(MetadataProvider.Tvdb);
+            return string.IsNullOrWhiteSpace(id) ? null : id;
         }
 
         private int? TryParseSeasonNumber(string? name)
