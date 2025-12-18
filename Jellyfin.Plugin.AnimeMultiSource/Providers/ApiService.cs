@@ -1073,6 +1073,12 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             var lowered = content.ToLowerInvariant();
 
+            // Valid AniDB responses include the <anime> root; don't treat those as ban/limit notices.
+            if (lowered.Contains("<anime"))
+            {
+                return false;
+            }
+
             // Avoid over-triggering on normal XML that happens to include "limit" tags
             var banPhrases = new[]
             {

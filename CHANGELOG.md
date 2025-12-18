@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.2.1 - 2025-12-18
+- Avoid false-positive AniDB ban detection on valid XML responses.
+
 ## 1.0.2.0 - 2025-12-18
 - Set assembly version to match plugin version.
 - Use cached AniDB tags even when AniDB is rate-limited.
