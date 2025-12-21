@@ -59,6 +59,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "wafuku -- TO BE SPLIT AND DELETED",
             "excessive censoring",
             "preaired episodes",
+            "censored uncensored version",
+            "season",
+            "uniform -- TO BE SPLIT AND DELETED",
+            "gun - TO BE SPLIT AND DELETED",
+            "unusual weapons -- TO BE SPLIT AND DELETED",
+            "RPG aspects",
+            "medieval -- TO BE SPLIT AND DELETED",
             "maintenance tags"
         };
 
