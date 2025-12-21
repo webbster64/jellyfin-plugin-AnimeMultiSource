@@ -96,7 +96,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             var plexMatchPath = Path.Combine(seriesPath, Constants.PlexMatchFileName);
             if (!File.Exists(plexMatchPath))
             {
-                _logger.LogDebug("No .plexmatch file found for {SeriesPath}", seriesPath);
+                _logger.LogWarning("***********************");
+                _logger.LogWarning("* no plexmatch file  *");
+                _logger.LogWarning("***********************");
                 return null;
             }
 

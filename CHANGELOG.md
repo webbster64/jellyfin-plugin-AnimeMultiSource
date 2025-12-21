@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.2.2 - 2025-12-21
+- Skip processing when .plexmatch is missing; log a clear banner and exit.
+
 ## 1.0.2.1 - 2025-12-18
 - Avoid false-positive AniDB ban detection on valid XML responses.
 
