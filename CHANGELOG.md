@@ -7,6 +7,9 @@
 - Aggregate AniDB tags across all mapped TV seasons for the series.
 - Populate season tags from AniDB per season mapping (no genre fallback).
 
+## 1.0.3.2 - 2025-12-22
+- Allow ONA titles to use Jikan data (fixes missing rating/title for Japan Sinks: 2020).
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

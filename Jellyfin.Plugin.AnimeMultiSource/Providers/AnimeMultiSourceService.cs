@@ -468,7 +468,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             if (jikanData == null) return false;
             if (string.IsNullOrWhiteSpace(jikanData.Type)) return true;
 
-            return jikanData.Type.StartsWith("TV", StringComparison.OrdinalIgnoreCase);
+            return jikanData.Type.StartsWith("TV", StringComparison.OrdinalIgnoreCase)
+                || jikanData.Type.Equals("ONA", StringComparison.OrdinalIgnoreCase);
         }
 
         private string? GetOriginalTitleFromJikan(JikanAnime? jikanData, Configuration.OriginalTitleFieldType field)
