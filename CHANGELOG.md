@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3.0 - 2025-12-21
+- Append an AMS rating label to the displayed rating line.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

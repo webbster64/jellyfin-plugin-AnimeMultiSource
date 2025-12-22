@@ -1,7 +1,7 @@
 {
   "guid": "8eca6f17-71fe-4309-a670-3cae083f22bd",
   "name": "AnimeMultiSource",
-  "version": "1.0.2.2",
+  "version": "1.0.3.0",
   "description": "Multi-source anime metadata provider using .plexmatch files and Fribb anime lists",
   "targetAbi": "10.11.3.0",
   "sourceUrl": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource",

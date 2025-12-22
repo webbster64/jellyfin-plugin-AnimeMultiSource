@@ -82,6 +82,15 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 result.Item.OfficialRating = metadata.ParentalRating;
 
+                // Append AMS score (tag count) to rating display without altering the numeric rating.
+                var amsScore = metadata.Tags?.Count ?? 0;
+                if (amsScore > 0)
+                {
+                    result.Item.OfficialRating = string.IsNullOrWhiteSpace(result.Item.OfficialRating)
+                        ? $"AMS-{amsScore}"
+                        : $"{result.Item.OfficialRating} AMS-{amsScore}";
+                }
+
                 // Set genres
                 if (metadata.Genres != null)
                     result.Item.Genres = metadata.Genres.ToArray();
