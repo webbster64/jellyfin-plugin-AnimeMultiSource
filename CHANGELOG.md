@@ -13,6 +13,9 @@
 ## 1.0.3.3 - 2025-12-22
 - Keep season-specific mappings when AniList root differs (prevents ID swaps on sequels like Treasure Chest of Courage).
 
+## 1.0.3.4 - 2025-12-22
+- Add mapping overrides for Dragon Ball entries and Ranking of Kings: Treasure Chest of Courage to prevent ID swaps.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

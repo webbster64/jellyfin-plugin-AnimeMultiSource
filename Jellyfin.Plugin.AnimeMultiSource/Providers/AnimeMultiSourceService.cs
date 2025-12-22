@@ -65,6 +65,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly AnimeListMapper _animeListMapper;
         private readonly ApiService _apiService;
         private readonly TagFilterService _tagFilterService;
+        private static readonly HashSet<long> _keepAniListMappingIds = new()
+        {
+            // Known cases where the sequel/spin-off must not be realigned to a different root
+            153452, // Ranking of Kings: The Treasure Chest of Courage
+            223,    // Dragon Ball
+            225,    // Dragon Ball GT
+            813,    // Dragon Ball Z
+            6033,   // Dragon Ball Z Kai
+            21175,  // Dragon Ball Super
+            170083  // Dragon Ball Daima
+            // Add more AniList IDs here when you find edge cases (e.g., specific Dragon Ball entries)
+        };
 
         public AnimeMultiSourceService(ILogger logger)
         {
@@ -142,8 +154,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             if (mapping.anilist_id.HasValue)
             {
+                var keepMapping = _keepAniListMappingIds.Contains(mapping.anilist_id.Value);
                 rootAniListId = await _apiService.GetRootAniListIdAsync(mapping.anilist_id.Value);
-                if (rootAniListId != mapping.anilist_id)
+                if (!keepMapping && rootAniListId != mapping.anilist_id)
                 {
                     _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", rootAniListId, mapping.anilist_id, plexMatchData.Title);
 
