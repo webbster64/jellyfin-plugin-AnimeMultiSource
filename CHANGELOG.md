@@ -16,6 +16,9 @@
 ## 1.0.3.4 - 2025-12-22
 - Add mapping overrides for Dragon Ball entries and Ranking of Kings: Treasure Chest of Courage to prevent ID swaps.
 
+## 1.0.3.5 - 2025-12-22
+- When a title is in the override list, skip AniList root realignment entirely (keeps per-show IDs/names for overrides like Dragon Ball Daima).
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

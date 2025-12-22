@@ -155,7 +155,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             if (mapping.anilist_id.HasValue)
             {
                 var keepMapping = _keepAniListMappingIds.Contains(mapping.anilist_id.Value);
-                rootAniListId = await _apiService.GetRootAniListIdAsync(mapping.anilist_id.Value);
+                rootAniListId = keepMapping
+                    ? mapping.anilist_id
+                    : await _apiService.GetRootAniListIdAsync(mapping.anilist_id.Value);
+
                 if (!keepMapping && rootAniListId != mapping.anilist_id)
                 {
                     _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", rootAniListId, mapping.anilist_id, plexMatchData.Title);

@@ -2,9 +2,9 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.AnimeMultiSource</RootNamespace>
-    <FileVersion>1.0.3.4</FileVersion>
-    <AssemblyVersion>1.0.3.4</AssemblyVersion>
-    <Version>1.0.3.4</Version>
+    <FileVersion>1.0.3.5</FileVersion>
+    <AssemblyVersion>1.0.3.5</AssemblyVersion>
+    <Version>1.0.3.5</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Nullable>enable</Nullable>
     <NoWarn>1591</NoWarn>
