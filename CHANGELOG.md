@@ -10,6 +10,9 @@
 ## 1.0.3.2 - 2025-12-22
 - Allow ONA titles to use Jikan data (fixes missing rating/title for Japan Sinks: 2020).
 
+## 1.0.3.3 - 2025-12-22
+- Keep season-specific mappings when AniList root differs (prevents ID swaps on sequels like Treasure Chest of Courage).
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

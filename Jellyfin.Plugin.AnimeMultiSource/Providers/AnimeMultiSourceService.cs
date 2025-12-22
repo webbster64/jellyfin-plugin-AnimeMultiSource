@@ -149,14 +149,15 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                     // Try to realign mapping using the root AniList ID so other provider IDs match the base series
                     var rootMapping = _animeListMapper.GetMappingByAniListId(rootAniListId.Value);
-                    if (rootMapping != null)
+                    if (rootMapping != null && rootMapping.thetvdb_id.HasValue && mapping.thetvdb_id.HasValue &&
+                        rootMapping.thetvdb_id.Value == mapping.thetvdb_id.Value)
                     {
                         _logger.LogInformation("Swapped mapping to AniList root {RootId} for series '{Title}' to correct provider IDs", rootAniListId, plexMatchData.Title);
                         mapping = rootMapping;
                     }
                     else
                     {
-                        _logger.LogWarning("No mapping found for AniList root {RootId}; keeping original mapping for provider IDs", rootAniListId);
+                        _logger.LogWarning("Keeping original mapping for '{Title}' (root {RootId}) to avoid mismatching provider IDs", plexMatchData.Title, rootAniListId);
                     }
                 }
             }
