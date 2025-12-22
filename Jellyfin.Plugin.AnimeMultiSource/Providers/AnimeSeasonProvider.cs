@@ -19,6 +19,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly ApiService _apiService;
         private readonly PlexMatchParser _plexMatchParser;
         private readonly AnimeListMapper _animeListMapper;
+        private readonly TagFilterService _tagFilterService;
         private PluginConfiguration _config;
 
         public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger)
@@ -35,6 +36,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             _apiService = new ApiService(httpClient, logger);
             _plexMatchParser = new PlexMatchParser(logger);
             _animeListMapper = new AnimeListMapper(httpClient, logger);
+            _tagFilterService = new TagFilterService();
         }
 
         public string Name => $"{Constants.PluginName} Season";
@@ -124,7 +126,6 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             {
                 var genres = seasonDetail.Genres;
                 season.Genres = genres.ToArray();
-                season.Tags = genres.ToArray();
             }
 
             season.ProviderIds ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -132,6 +133,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             if (seasonDetail.MalId.HasValue)
             {
                 season.SetProviderId(Constants.MalProviderId, seasonDetail.MalId.Value.ToString());
+            }
+
+            // Season-level tags from AniDB via mapping
+            if (_config.EnableAniDbTags)
+            {
+                var seasonTags = await GetSeasonTagsAsync(seasonDetail.AniListId);
+                season.Tags = seasonTags.ToArray();
             }
 
             result.Item = season;
@@ -310,6 +318,40 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             return null;
+        }
+
+        private async Task<List<string>> GetSeasonTagsAsync(int aniListSeasonId)
+        {
+            try
+            {
+                await _animeListMapper.LoadAnimeListsAsync();
+                var mapping = _animeListMapper.GetMappingByAniListId(aniListSeasonId);
+                var aniDbId = mapping?.anidb_id;
+                if (!aniDbId.HasValue)
+                {
+                    return new List<string>();
+                }
+
+                var tags = await _apiService.GetAniDbTagsAsync(
+                    aniDbId.Value,
+                    _config.AniDbClientName,
+                    _config.AniDbClientVersion,
+                    _config.AniDbRateLimit);
+
+                if (tags == null || tags.Count == 0)
+                {
+                    return new List<string>();
+                }
+
+                var filtered = _tagFilterService.FilterTags(tags);
+                _tagFilterService.LogFilteredTags(_logger, tags, filtered);
+                return filtered;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching season tags for AniList season {AniListId}", aniListSeasonId);
+                return new List<string>();
+            }
         }
     }
 }

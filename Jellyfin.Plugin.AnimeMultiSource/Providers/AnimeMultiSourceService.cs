@@ -285,34 +285,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             // Fetch tags from AniDB if enabled and we have an AniDB ID
-            if (config.EnableAniDbTags && !string.IsNullOrEmpty(metadata.AniDbId))
+            if (config.EnableAniDbTags)
             {
-                if (long.TryParse(metadata.AniDbId, out long anidbId))
-                {
-                    _logger.LogDebug("Attempting to fetch AniDB tags for ID: {AniDbId}", anidbId);
-                    try
-                    {
-                        var aniDbTags = await _apiService.GetAniDbTagsAsync(
-                            anidbId, 
-                            config.AniDbClientName, 
-                            config.AniDbClientVersion,
-                            config.AniDbRateLimit
-                        );
-                        
-                        metadata.Tags = aniDbTags;
-                        _logger.LogDebug("Fetched {Count} AniDB tags for {Title}", aniDbTags.Count, metadata.Title);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error fetching AniDB tags for {Title}", metadata.Title);
-                        metadata.Tags = new List<string>();
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Unable to parse AniDB ID: {AniDbId}", metadata.AniDbId);
-                    metadata.Tags = new List<string>();
-                }
+                metadata.Tags = await GetAggregatedAniDbTagsAsync(mapping, metadata.Seasons, config);
             }
             else
             {
@@ -323,6 +298,61 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 metadata.Title, metadata.Genres?.Count ?? 0, metadata.Studios?.Count ?? 0, metadata.People?.Count ?? 0, metadata.Tags?.Count ?? 0);
 
             return metadata;
+        }
+
+        private async Task<List<string>> GetAggregatedAniDbTagsAsync(
+            AnimeMapping mapping,
+            List<SeasonRelation>? seasons,
+            Configuration.PluginConfiguration config)
+        {
+            var tagBuckets = new List<string>();
+            var seenIds = new HashSet<long>();
+
+            await _animeListMapper.LoadAnimeListsAsync();
+
+            void AddId(long? id)
+            {
+                if (id.HasValue && id.Value > 0)
+                {
+                    seenIds.Add(id.Value);
+                }
+            }
+
+            AddId(mapping.anidb_id);
+
+            if (seasons != null)
+            {
+                foreach (var season in seasons)
+                {
+                    var seasonMapping = _animeListMapper.GetMappingByAniListId(season.AniListId);
+                    AddId(seasonMapping?.anidb_id);
+                }
+            }
+
+            foreach (var id in seenIds)
+            {
+                try
+                {
+                    _logger.LogDebug("Attempting to fetch AniDB tags for aggregated ID: {AniDbId}", id);
+                    var tags = await _apiService.GetAniDbTagsAsync(
+                        id,
+                        config.AniDbClientName,
+                        config.AniDbClientVersion,
+                        config.AniDbRateLimit);
+                    if (tags?.Count > 0)
+                    {
+                        tagBuckets.AddRange(tags);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching AniDB tags for aggregated ID {AniDbId}", id);
+                }
+            }
+
+            var filtered = _tagFilterService.FilterTags(tagBuckets);
+            _tagFilterService.LogFilteredTags(_logger, tagBuckets, filtered);
+            return filtered;
         }
 
         // ... rest of your existing helper methods (GetConfiguredTitle, GetConfiguredOriginalTitle, etc.) remain the same ...
