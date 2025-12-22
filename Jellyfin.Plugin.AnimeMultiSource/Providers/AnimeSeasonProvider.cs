@@ -55,13 +55,20 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             var baseAniListId = await ResolveRootAniListIdAsync(info);
+            var seasonNumber = info.IndexNumber.Value;
             if (!baseAniListId.HasValue)
             {
                 _logger.LogWarning("Skipping season metadata: unable to resolve AniList root id for {Name}", info.Name);
                 return result;
             }
 
-            var seasonNumber = info.IndexNumber.Value;
+            // For certain series, defer later seasons to TVDB/other providers to avoid bad AniList chains.
+            if (baseAniListId.HasValue && AnimeMultiSourceService.ShouldDeferSeasonToTvdb(baseAniListId.Value, seasonNumber))
+            {
+                _logger.LogInformation("Skipping season metadata for {Name} S{SeasonNumber}: deferred to TVDB/other providers (override rule)", info.Name, seasonNumber);
+                return result;
+            }
+
             _logger.LogInformation("Fetching season metadata for {Name} S{SeasonNumber} using AniList base ID {AniListId}", info.Name, seasonNumber, baseAniListId);
 
             var seasonDetail = await _apiService.GetSeasonByNumberAsync(baseAniListId.Value, seasonNumber);

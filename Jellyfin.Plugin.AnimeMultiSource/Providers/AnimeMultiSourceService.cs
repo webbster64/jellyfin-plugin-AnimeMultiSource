@@ -77,6 +77,22 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             170083  // Dragon Ball Daima
             // Add more AniList IDs here when you find edge cases (e.g., specific Dragon Ball entries)
         };
+        private static readonly HashSet<long> _deferSeasonAniListIds = new()
+        {
+            // Defer all seasons to TVDB/other providers for the Dragon Ball family
+            223,    // Dragon Ball
+            225,    // Dragon Ball GT
+            813,    // Dragon Ball Z
+            6033,   // Dragon Ball Z Kai
+            21175,  // Dragon Ball Super
+            170083  // Dragon Ball Daima
+        };
+
+        public static bool ShouldDeferSeasonToTvdb(long baseAniListId, int seasonNumber)
+        {
+            // Defer all seasons for specified AniList IDs to avoid bad AniList chains/names.
+            return _deferSeasonAniListIds.Contains(baseAniListId);
+        }
 
         public AnimeMultiSourceService(ILogger logger)
         {

@@ -62,6 +62,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "censored uncensored version",
             "season",
             "shounen",
+            "STAFF MISSING",
             "multiple protagonists - TO BE MOVED TO PARENT OR DELETED",
             "school festival - TO BE SPLIT AND DELETED",
             "uniform -- TO BE SPLIT AND DELETED",
