@@ -22,6 +22,9 @@
 ## 1.0.3.6 - 2025-12-22
 - Defer all Dragon Ball seasons to TVDB/other providers to avoid broken AniList chains and incorrect season names.
 
+## 1.0.3.7 - 2025-12-27
+- Version bump to publish the latest fixes.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 
