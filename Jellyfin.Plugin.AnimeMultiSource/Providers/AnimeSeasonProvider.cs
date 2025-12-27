@@ -74,6 +74,28 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             var seasonDetail = await _apiService.GetSeasonByNumberAsync(baseAniListId.Value, seasonNumber);
             if (seasonDetail == null)
             {
+                if (_config.SeasonTitleFormat == SeasonTitleFormatType.Numbered)
+                {
+                    var seasonNameFallback = seasonNumber <= 0 ? "Specials" : $"Season {seasonNumber}";
+                    var sortNameFallback = $"Season {seasonNumber:00}";
+                    _logger.LogWarning(
+                        "No season detail found for {Name} S{SeasonNumber} (AniList base {AniListId}); applying numbered fallback title",
+                        info.Name, seasonNumber, baseAniListId);
+
+                    var fallbackSeason = new Season
+                    {
+                        Name = seasonNameFallback,
+                        SortName = sortNameFallback,
+                        ForcedSortName = sortNameFallback,
+                        OriginalTitle = seasonNameFallback,
+                        IndexNumber = seasonNumber
+                    };
+
+                    result.Item = fallbackSeason;
+                    result.HasMetadata = true;
+                    return result;
+                }
+
                 _logger.LogWarning("No season detail found for {Name} S{SeasonNumber} (AniList base {AniListId})", info.Name, seasonNumber, baseAniListId);
                 return result;
             }

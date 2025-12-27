@@ -319,16 +319,63 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     return detail;
                 }
 
-                if (!detail.SequelAniListId.HasValue)
+                var nextId = detail.SequelAniListId;
+
+                // If no direct TV sequel link, try to walk through movies/OVAs until we reach the next TV/TV_SHORT node.
+                if (!nextId.HasValue)
+                {
+                    nextId = await ResolveNextTvSequelAsync(detail);
+                }
+
+                if (!nextId.HasValue)
                 {
                     _logger.LogWarning("Missing sequel link after season {SeasonIndex} for AniList ID {AniListId}", i, currentId);
                     return null;
                 }
 
-                currentId = detail.SequelAniListId.Value;
+                currentId = nextId.Value;
             }
 
             return detail;
+        }
+
+        private async Task<int?> ResolveNextTvSequelAsync(AniListSeasonDetail detail)
+        {
+            var visited = new HashSet<int>();
+            var currentDetail = detail;
+
+            while (true)
+            {
+                var sequelId = SelectPreferredRelation(currentDetail.Relations, "SEQUEL", tvOnly: false);
+                if (!sequelId.HasValue)
+                {
+                    return null;
+                }
+
+                if (!visited.Add(sequelId.Value))
+                {
+                    return null;
+                }
+
+                var sequelDetail = await GetAniListSeasonDetailAsync(sequelId.Value);
+                if (sequelDetail == null)
+                {
+                    return null;
+                }
+
+                if (IsTvLike(sequelDetail.Format))
+                {
+                    return sequelDetail.AniListId;
+                }
+
+                currentDetail = sequelDetail;
+            }
+        }
+
+        private static bool IsTvLike(string? format)
+        {
+            return string.Equals(format, "TV", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(format, "TV_SHORT", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<AniListSeasonDetail?> GetSpecialSeasonDetailAsync(int baseAniListId)

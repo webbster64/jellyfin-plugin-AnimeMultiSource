@@ -25,6 +25,10 @@
 ## 1.0.3.7 - 2025-12-27
 - Version bump to publish the latest fixes.
 
+## 1.0.3.8 - 2025-12-27
+- Follow AniList sequel chains through movies/OVAs to find the next TV season, preventing season-name fallback when a film sits between seasons (e.g., KonoSuba S3).
+- Keep numbered season titles even if AniList has no season detail, avoiding TVDB names when using “Season {number}”.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 
