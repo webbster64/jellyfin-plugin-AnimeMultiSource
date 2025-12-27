@@ -36,6 +36,9 @@
 - Refine AniList relation traversal: score sequel/side-story/alternative links and formats (TV/TV_SHORT/ONA/OVA/MOVIE) and walk through movies using duration heuristics to reach the next TV season, keeping AniList/MAL IDs instead of falling back.
 - Ensure season traversal build matches release version to avoid mixed-version loads.
 
+## 1.0.4.1 - 2025-12-27
+- Include AniList duration on relation nodes to strengthen movie-to-season traversal and keep AniList/MAL IDs on downstream seasons (e.g., KonoSuba S3).
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

@@ -63,6 +63,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "season",
             "josei",
             "shounen",
+            "sexual abuse -- TO BE SPLIT AND DELETED",
             "STAFF MISSING",
             "multiple protagonists - TO BE MOVED TO PARENT OR DELETED",
             "school festival - TO BE SPLIT AND DELETED",
