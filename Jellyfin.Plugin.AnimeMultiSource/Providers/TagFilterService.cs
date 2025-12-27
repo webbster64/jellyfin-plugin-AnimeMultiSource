@@ -61,6 +61,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "preaired episodes",
             "censored uncensored version",
             "season",
+            "josei",
             "shounen",
             "STAFF MISSING",
             "multiple protagonists - TO BE MOVED TO PARENT OR DELETED",
