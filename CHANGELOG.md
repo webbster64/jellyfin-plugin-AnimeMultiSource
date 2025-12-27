@@ -39,6 +39,9 @@
 ## 1.0.4.1 - 2025-12-27
 - Include AniList duration on relation nodes to strengthen movie-to-season traversal and keep AniList/MAL IDs on downstream seasons (e.g., KonoSuba S3).
 
+## 1.0.4.2 - 2025-12-27
+- Force-refresh AniList season details (relations + duration) when a sequel link is missing, and refresh non-TV nodes during traversal to ensure movie hops lead to the next TV season. This should resolve KonoSuba S3 IDs without manual intervention.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

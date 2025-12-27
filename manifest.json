@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/webbster64/jellyfin-plugin-AnimeMultiSource/main/media/logo.png",
     "versions": [
       {
+        "version": "1.0.4.2",
+        "changelog": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases/tag/v1.0.4.2",
+        "targetAbi": "10.11.3.0",
+        "sourceUrl": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases/download/v1.0.4.2/AnimeMultiSource_v1.0.4.2.zip",
+        "checksum": "2348876E19E2389907D73FFAF072BF0F",
+        "timestamp": "2025-12-27T13:35:00Z"
+      },
+      {
         "version": "1.0.4.1",
         "changelog": "https://github.com/webbster64/jellyfin-plugin-AnimeMultiSource/releases/tag/v1.0.4.1",
         "targetAbi": "10.11.3.0",

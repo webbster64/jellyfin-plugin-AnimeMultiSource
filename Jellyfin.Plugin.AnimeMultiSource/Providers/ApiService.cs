@@ -206,9 +206,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return null;
         }
 
-        public async Task<AniListSeasonDetail?> GetAniListSeasonDetailAsync(int aniListId)
+        public async Task<AniListSeasonDetail?> GetAniListSeasonDetailAsync(int aniListId, bool forceRefresh = false)
         {
-            if (TryGetAniListCache(_aniListSeasonCache, aniListId, "season", out AniListSeasonDetail cached))
+            if (!forceRefresh && TryGetAniListCache(_aniListSeasonCache, aniListId, "season", out AniListSeasonDetail cached))
             {
                 return cached;
             }
@@ -326,6 +326,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 // If no direct TV sequel link, try to walk through movies/OVAs until we reach the next TV/TV_SHORT (or season-like) node.
                 if (!nextId.HasValue)
                 {
+                    // Refresh detail to ensure relations/duration are present before traversal.
+                    var refreshed = await GetAniListSeasonDetailAsync(currentId, forceRefresh: true);
+                    if (refreshed != null)
+                    {
+                        detail = refreshed;
+                    }
+
                     nextId = await ResolveNextTvSequelAsync(detail);
                 }
 
@@ -359,7 +366,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     return null;
                 }
 
-                var sequelDetail = await GetAniListSeasonDetailAsync(nextId.Value);
+                var sequelDetail = await GetAniListSeasonDetailAsync(nextId.Value, forceRefresh: true);
                 if (sequelDetail == null)
                 {
                     return null;
