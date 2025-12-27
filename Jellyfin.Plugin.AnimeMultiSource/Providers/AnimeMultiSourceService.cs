@@ -171,33 +171,77 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             if (mapping.anilist_id.HasValue)
             {
                 var keepMapping = _keepAniListMappingIds.Contains(mapping.anilist_id.Value);
-                rootAniListId = keepMapping
+                var proposedRoot = keepMapping
                     ? mapping.anilist_id
                     : await _apiService.GetRootAniListIdAsync(mapping.anilist_id.Value);
 
-                if (!keepMapping && rootAniListId != mapping.anilist_id)
+                if (!keepMapping && proposedRoot != mapping.anilist_id)
                 {
-                    _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", rootAniListId, mapping.anilist_id, plexMatchData.Title);
+                    _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", proposedRoot, mapping.anilist_id, plexMatchData.Title);
+                }
 
-                    // Try to realign mapping using the root AniList ID so other provider IDs match the base series
-                    var rootMapping = _animeListMapper.GetMappingByAniListId(rootAniListId.Value);
-                    if (rootMapping != null && rootMapping.thetvdb_id.HasValue && mapping.thetvdb_id.HasValue &&
-                        rootMapping.thetvdb_id.Value == mapping.thetvdb_id.Value)
+                // Choose between mapped vs root based on year proximity when available
+                if (proposedRoot.HasValue && proposedRoot != mapping.anilist_id && !keepMapping)
+                {
+                    var mappedMedia = await _apiService.GetAniListAnimeAsync(mapping.anilist_id.Value);
+                    var rootMedia = await _apiService.GetAniListAnimeAsync(proposedRoot.Value);
+
+                    int? plexYear = plexMatchData.Year;
+                    int? mappedYear = mappedMedia?.StartDate?.Year;
+                    int? rootYear = rootMedia?.StartDate?.Year;
+
+                    bool haveYear = plexYear.HasValue && (mappedYear.HasValue || rootYear.HasValue);
+                    if (haveYear)
                     {
-                        _logger.LogInformation("Swapped mapping to AniList root {RootId} for series '{Title}' to correct provider IDs", rootAniListId, plexMatchData.Title);
-                        mapping = rootMapping;
+                        var mappedDelta = mappedYear.HasValue ? Math.Abs(mappedYear.Value - plexYear!.Value) : int.MaxValue;
+                        var rootDelta = rootYear.HasValue ? Math.Abs(rootYear.Value - plexYear!.Value) : int.MaxValue;
+
+                        if (mappedDelta <= rootDelta)
+                        {
+                            _logger.LogInformation("Keeping mapped AniList ID {MappedId} for '{Title}' based on year proximity (mapped {MappedYear}, root {RootYear}, target {TargetYear})",
+                                mapping.anilist_id, plexMatchData.Title, mappedYear, rootYear, plexYear);
+                            rootAniListId = mapping.anilist_id;
+                            aniListData = mappedMedia;
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Switching to AniList root {RootId} for '{Title}' based on year proximity (mapped {MappedYear}, root {RootYear}, target {TargetYear})",
+                                proposedRoot, plexMatchData.Title, mappedYear, rootYear, plexYear);
+                            rootAniListId = proposedRoot;
+                            aniListData = rootMedia;
+                        }
                     }
                     else
                     {
-                        _logger.LogWarning("Keeping original mapping for '{Title}' (root {RootId}) to avoid mismatching provider IDs", plexMatchData.Title, rootAniListId);
+                        rootAniListId = proposedRoot;
                     }
+
+                    // Try to realign mapping using the chosen AniList ID if TVDB matches
+                    if (rootAniListId != mapping.anilist_id)
+                    {
+                        var rootMapping = _animeListMapper.GetMappingByAniListId(rootAniListId.Value);
+                        if (rootMapping != null && rootMapping.thetvdb_id.HasValue && mapping.thetvdb_id.HasValue &&
+                            rootMapping.thetvdb_id.Value == mapping.thetvdb_id.Value)
+                        {
+                            _logger.LogInformation("Swapped mapping to AniList {ChosenId} for series '{Title}' to correct provider IDs", rootAniListId, plexMatchData.Title);
+                            mapping = rootMapping;
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Keeping original mapping for '{Title}' (chosen {ChosenId}) to avoid mismatching provider IDs", plexMatchData.Title, rootAniListId);
+                        }
+                    }
+                }
+                else
+                {
+                    rootAniListId = mapping.anilist_id;
                 }
             }
 
             // Fetch from AniList if we have AniList ID
             if (rootAniListId.HasValue)
             {
-                aniListData = await _apiService.GetAniListAnimeAsync(rootAniListId.Value);
+                aniListData ??= await _apiService.GetAniListAnimeAsync(rootAniListId.Value);
             }
 
             // Prefer MAL ID from AniList root if available (avoids OVA mappings)
