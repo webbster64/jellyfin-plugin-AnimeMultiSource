@@ -225,6 +225,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                         }
                         description
                         genres
+                        duration
                         averageScore
                         startDate { year month day }
                         endDate { year month day }
@@ -233,7 +234,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                         relations {
                             edges {
                                 relationType
-                                node { id format type }
+                                node { id format type duration episodes season seasonYear }
                             }
                         }
                     }

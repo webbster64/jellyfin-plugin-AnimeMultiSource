@@ -212,6 +212,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         [JsonPropertyName("episodes")]
         public int? Episodes { get; set; }
 
+        [JsonPropertyName("duration")]
+        public int? Duration { get; set; }
+
         [JsonPropertyName("season")]
         public string? Season { get; set; }
 
