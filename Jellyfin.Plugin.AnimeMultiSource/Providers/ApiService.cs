@@ -394,13 +394,6 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             return false;
         }
-
-        private static bool IsTvFormat(string? format)
-        {
-            return string.Equals(format, "TV", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(format, "TV_SHORT", StringComparison.OrdinalIgnoreCase);
-        }
-
         private async Task<AniListSeasonDetail?> GetSpecialSeasonDetailAsync(int baseAniListId)
         {
             var visited = new HashSet<int>();
