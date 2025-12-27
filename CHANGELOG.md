@@ -29,6 +29,9 @@
 - Follow AniList sequel chains through movies/OVAs to find the next TV season, preventing season-name fallback when a film sits between seasons (e.g., KonoSuba S3).
 - Keep numbered season titles even if AniList has no season detail, avoiding TVDB names when using “Season {number}”.
 
+## 1.0.3.9 - 2025-12-27
+- Treat AniList entries with duration <= 60 minutes (or known long-episode exceptions like Initial D Third Stage) as season candidates when walking sequel chains, so season provider keeps AniList/MAL IDs even when a movie sits between TV seasons.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

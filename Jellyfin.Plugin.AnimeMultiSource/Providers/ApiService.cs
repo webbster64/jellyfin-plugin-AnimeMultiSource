@@ -276,6 +276,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 EndDate = ToDateTime(media.EndDate),
                 Status = media.Status,
                 Episodes = media.Episodes,
+                Duration = media.Duration,
                 SequelAniListId = sequelId,
                 Format = media.Format,
                 Type = media.Type,
@@ -321,7 +322,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 var nextId = detail.SequelAniListId;
 
-                // If no direct TV sequel link, try to walk through movies/OVAs until we reach the next TV/TV_SHORT node.
+                // If no direct TV sequel link, try to walk through movies/OVAs until we reach the next TV/TV_SHORT (or season-like) node.
                 if (!nextId.HasValue)
                 {
                     nextId = await ResolveNextTvSequelAsync(detail);
@@ -363,7 +364,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     return null;
                 }
 
-                if (IsTvLike(sequelDetail.Format))
+                if (IsSeasonCandidate(sequelDetail))
                 {
                     return sequelDetail.AniListId;
                 }
@@ -372,7 +373,29 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
         }
 
-        private static bool IsTvLike(string? format)
+        private bool IsSeasonCandidate(AniListSeasonDetail detail)
+        {
+            // Season-like if TV/TV_SHORT, or typical episode duration, or specific known long-episode TV entries.
+            if (IsTvFormat(detail.Format))
+            {
+                return true;
+            }
+
+            if (detail.Duration.HasValue && detail.Duration.Value <= 60)
+            {
+                return true;
+            }
+
+            var title = (detail.TitleEnglish ?? detail.TitleRomaji ?? detail.TitleNative ?? string.Empty).ToLowerInvariant();
+            if (title.Contains("initial d") && title.Contains("third stage"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsTvFormat(string? format)
         {
             return string.Equals(format, "TV", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(format, "TV_SHORT", StringComparison.OrdinalIgnoreCase);
@@ -1600,6 +1623,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             public DateTime? EndDate { get; set; }
             public string? Status { get; set; }
             public int? Episodes { get; set; }
+            public int? Duration { get; set; }
             public int? SequelAniListId { get; set; }
             public string? Format { get; set; }
             public string? Type { get; set; }
