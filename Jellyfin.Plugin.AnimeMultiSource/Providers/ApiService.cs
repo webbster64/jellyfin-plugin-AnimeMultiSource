@@ -347,18 +347,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             while (true)
             {
-                var sequelId = SelectPreferredRelation(currentDetail.Relations, "SEQUEL", tvOnly: false);
-                if (!sequelId.HasValue)
+                var nextId = SelectNextRelation(currentDetail);
+                if (!nextId.HasValue)
                 {
                     return null;
                 }
 
-                if (!visited.Add(sequelId.Value))
+                if (!visited.Add(nextId.Value))
                 {
                     return null;
                 }
 
-                var sequelDetail = await GetAniListSeasonDetailAsync(sequelId.Value);
+                var sequelDetail = await GetAniListSeasonDetailAsync(nextId.Value);
                 if (sequelDetail == null)
                 {
                     return null;
@@ -371,6 +371,68 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 currentDetail = sequelDetail;
             }
+        }
+
+        private int? SelectNextRelation(AniListSeasonDetail detail)
+        {
+            if (detail.Relations == null || detail.Relations.Count == 0)
+            {
+                return null;
+            }
+
+            int RelationScore(string relationType)
+            {
+                return relationType.ToUpperInvariant() switch
+                {
+                    "SEQUEL" => 3,
+                    "SIDE_STORY" => 2,
+                    "ALTERNATIVE" => 1,
+                    _ => 0
+                };
+            }
+
+            int FormatScore(AniListRelationEdge edge)
+            {
+                var format = edge.Node?.Format?.ToUpperInvariant() ?? string.Empty;
+                return format switch
+                {
+                    "TV" => 5,
+                    "TV_SHORT" => 4,
+                    "ONA" => 3,
+                    "OVA" => 2,
+                    "MOVIE" => 1,
+                    _ => 0
+                };
+            }
+
+            var candidate = detail.Relations
+                .Where(e => e?.Node != null && !string.IsNullOrEmpty(e.Node.Id.ToString()))
+                .OrderByDescending(e => IsSeasonCandidateFromEdge(e) ? 1 : 0)
+                .ThenByDescending(e => RelationScore(e!.RelationType ?? string.Empty))
+                .ThenByDescending(FormatScore)
+                .FirstOrDefault();
+
+            return candidate?.Node?.Id;
+        }
+
+        private bool IsSeasonCandidateFromEdge(AniListRelationEdge edge)
+        {
+            var node = edge.Node;
+            if (node == null) return false;
+
+            // Use available edge data first; fall back to cached season detail if we have it.
+            if (IsTvFormat(node.Format))
+            {
+                return true;
+            }
+
+            // If we have cached detail, reuse to inspect duration.
+            if (TryGetAniListCache(_aniListSeasonCache, node.Id, "season", out AniListSeasonDetail cachedDetail))
+            {
+                return IsSeasonCandidate(cachedDetail);
+            }
+
+            return false;
         }
 
         private bool IsSeasonCandidate(AniListSeasonDetail detail)

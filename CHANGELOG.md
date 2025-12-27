@@ -32,6 +32,10 @@
 ## 1.0.3.9 - 2025-12-27
 - Treat AniList entries with duration <= 60 minutes (or known long-episode exceptions like Initial D Third Stage) as season candidates when walking sequel chains, so season provider keeps AniList/MAL IDs even when a movie sits between TV seasons.
 
+## 1.0.4.0 - 2025-12-27
+- Refine AniList relation traversal: score sequel/side-story/alternative links and formats (TV/TV_SHORT/ONA/OVA/MOVIE) and walk through movies using duration heuristics to reach the next TV season, keeping AniList/MAL IDs instead of falling back.
+- Ensure season traversal build matches release version to avoid mixed-version loads.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 
