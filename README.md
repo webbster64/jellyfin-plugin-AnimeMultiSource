@@ -13,7 +13,6 @@ Remote anime metadata, tags, artwork and people for Jellyfin using multiple sour
 - Jellyfin 10.11.2+ (net9.0 plugin, ABI 10.11.2.0)
 - API keys (optional but recommended):
   - Fanart.tv personal API key
-  - AniDB client name/version (for tags)
 
 ### .plexmatch files (strongly recommended)
 - The plugin honors `.plexmatch` files to improve ID resolution (title/year/TVDB/IMDb overrides). These files prevent mis-matches on tricky titles, remasters, and specials.
@@ -54,6 +53,11 @@ Open **Dashboard -> Plugins -> Anime Multi Source**:
 - `.plexmatch` files are honored for ID hints (title/year/TVDB/IMDb).
 - If AniDB is temporarily paused, tags will be skipped for that window but metadata will still complete; caching prevents repeat hits after the first successful fetch.
 - Logs include rate-limit waits, cache hits, and any AniDB backoff reasons to help diagnose slowdowns.
+
+### File and folder naming
+- Use standard season/episode naming: `Show Name/Season 1/Show Name - S01E12 - Title.mkv`. Avoid date/daily formats (e.g., `Show Name - 2022-03-23.mkv`) because Jellyfin/TVDB episode mapping will be skipped.
+- Keep one series per folder with season subfolders (`Season 1`, `Season 2`, …). Place `.plexmatch` in the series root.
+- If using Sonarr/Radarr, set the series type to “Standard” (not “Daily/Date”) so files are named with `SxxEyy`.
 
 ## Troubleshooting
 - No tags? Check logs for AniDB backoff messages; waits clear automatically. After a successful tag pull, results are cached/persisted for 5 days.
