@@ -42,6 +42,9 @@
 ## 1.0.4.2 - 2025-12-27
 - Force-refresh AniList season details (relations + duration) when a sequel link is missing, and refresh non-TV nodes during traversal to ensure movie hops lead to the next TV season. This should resolve KonoSuba S3 IDs without manual intervention.
 
+## 1.0.4.3 - 2025-12-28
+- When mapping points to a sequel/spin-off, prefer the root AniList media for titles/overview only if it’s not on the override list and its year is closer to the .plexmatch year (keeps Ranking of Kings/Dragon Ball overrides and year-sensitive matches like FM Ghost intact).
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 

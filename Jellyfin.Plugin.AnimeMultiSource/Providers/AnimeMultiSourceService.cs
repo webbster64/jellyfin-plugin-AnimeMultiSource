@@ -271,6 +271,34 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             long? effectiveMalId,
             Configuration.PluginConfiguration config)
         {
+            // Prefer root AniList media when mapping points at a sequel/spin-off stage.
+            AniListMedia? aniListPrimary = aniListData;
+            var mappedAniListId = mapping.anilist_id;
+            var mappedIsPinned = mappedAniListId.HasValue && _keepAniListMappingIds.Contains(mappedAniListId.Value);
+            if (rootAniListId.HasValue && aniListData?.Id != rootAniListId.Value && !mappedIsPinned)
+            {
+                var rootMedia = await _apiService.GetAniListAnimeAsync(rootAniListId.Value);
+                if (rootMedia != null)
+                {
+                    var plexYear = plexMatchData.Year;
+                    var mappedYear = aniListData?.StartDate?.Year;
+                    var rootYear = rootMedia.StartDate?.Year;
+
+                    var useRoot = true;
+                    if (plexYear.HasValue && mappedYear.HasValue && rootYear.HasValue)
+                    {
+                        var diffMapped = Math.Abs(mappedYear.Value - plexYear.Value);
+                        var diffRoot = Math.Abs(rootYear.Value - plexYear.Value);
+                        useRoot = diffRoot <= diffMapped;
+                    }
+
+                    if (useRoot)
+                    {
+                        aniListPrimary = rootMedia;
+                    }
+                }
+            }
+
             var metadata = new AnimeMetadata
             {
                 // Basic info from .plexmatch
@@ -300,17 +328,17 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             // Apply configuration for Title and OriginalTitle selection
-            metadata.Title = GetConfiguredTitle(primaryJikan, aniListData, config);
-            metadata.OriginalTitle = GetConfiguredOriginalTitle(primaryJikan, aniListData, config);
+            metadata.Title = GetConfiguredTitle(primaryJikan, aniListPrimary, config);
+            metadata.OriginalTitle = GetConfiguredOriginalTitle(primaryJikan, aniListPrimary, config);
 
             // Status from Jikan
             metadata.Status = _apiService.MapJikanStatus(primaryJikan?.Status);
 
             // Community Rating - convert AniList score (0-100) to 0-10 scale
-            metadata.CommunityRating = primaryJikan?.Score ?? (aniListData?.AverageScore / 10.0);
+            metadata.CommunityRating = primaryJikan?.Score ?? (aniListPrimary?.AverageScore / 10.0);
 
             // Overview - prefer Jikan, fallback to AniList
-            metadata.Overview = primaryJikan?.Synopsis ?? aniListData?.Description;
+            metadata.Overview = primaryJikan?.Synopsis ?? aniListPrimary?.Description;
 
             // Dates from Jikan
             metadata.ReleaseDate = primaryJikan?.Aired?.From;
