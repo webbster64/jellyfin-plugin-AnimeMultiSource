@@ -48,6 +48,9 @@
 ## 1.0.4.4 - 2025-12-28
 - Walk backwards through AniList PREQUEL relations (using year proximity and duration heuristics, with long-episode exceptions) to pick the correct starting AniList ID when Fribb maps to a later sequel (fixes Initial D being labeled as “Fourth Stage”).
 
+## 1.0.4.5 - 2025-12-29
+- Rebuild with corrected manifest checksum so Jellyfin auto-update installs cleanly.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 
