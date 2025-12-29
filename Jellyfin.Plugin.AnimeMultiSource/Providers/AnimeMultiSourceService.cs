@@ -77,6 +77,11 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             170083  // Dragon Ball Daima
             // Add more AniList IDs here when you find edge cases (e.g., specific Dragon Ball entries)
         };
+        // Long-episode “season” exceptions (movies that should still count as season bridges)
+        private static readonly HashSet<long> _longEpisodeAniListIds = new()
+        {
+            187 // Initial D Third Stage (movie, ~104 minutes)
+        };
         private static readonly HashSet<long> _deferSeasonAniListIds = new()
         {
             // Defer all seasons to TVDB/other providers for the Dragon Ball family
@@ -170,20 +175,45 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             if (mapping.anilist_id.HasValue)
             {
-                var keepMapping = _keepAniListMappingIds.Contains(mapping.anilist_id.Value);
+                var mappedAniListIdValue = mapping.anilist_id!.Value;
+                aniListData = await _apiService.GetAniListAnimeAsync(mappedAniListIdValue);
+
+                var keepMapping = _keepAniListMappingIds.Contains(mappedAniListIdValue);
+
+                // If the mapped AniList entry is a sequel (e.g., Initial D Fourth Stage),
+                // try walking PREQUEL links to find the closest year match for the plexmatch year.
+                if (!keepMapping && plexMatchData.Year.HasValue && aniListData?.Relations?.Edges != null)
+                {
+                    var prequelRoot = await FindBestPrequelRootAsync(mappedAniListIdValue, plexMatchData.Year!.Value);
+                    if (prequelRoot.HasValue && prequelRoot.Value != mappedAniListIdValue)
+                    {
+                        _logger.LogInformation("Switching to AniList prequel {PrequelId} for '{Title}' based on year match to {Year}",
+                            prequelRoot, plexMatchData.Title, plexMatchData.Year);
+                        rootAniListId = prequelRoot;
+                        aniListData = await _apiService.GetAniListAnimeAsync(prequelRoot.Value);
+
+                        var prequelMapping = _animeListMapper.GetMappingByAniListId(prequelRoot.Value);
+                        if (prequelMapping != null && prequelMapping.thetvdb_id.HasValue && mapping.thetvdb_id.HasValue &&
+                            prequelMapping.thetvdb_id.Value == mapping.thetvdb_id.Value)
+                        {
+                            mapping = prequelMapping;
+                        }
+                    }
+                }
+
                 var proposedRoot = keepMapping
-                    ? mapping.anilist_id
-                    : await _apiService.GetRootAniListIdAsync(mapping.anilist_id.Value);
+                    ? (rootAniListId ?? mapping.anilist_id)
+                    : await _apiService.GetRootAniListIdAsync(rootAniListId ?? mappedAniListIdValue);
 
                 if (!keepMapping && proposedRoot != mapping.anilist_id)
                 {
-                    _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", proposedRoot, mapping.anilist_id, plexMatchData.Title);
+                    _logger.LogInformation("Using AniList root ID {RootId} instead of mapped ID {MappedId} for series '{Title}'", proposedRoot, mappedAniListIdValue, plexMatchData.Title);
                 }
 
                 // Choose between mapped vs root based on year proximity when available
-                if (proposedRoot.HasValue && proposedRoot != mapping.anilist_id && !keepMapping)
+                if (proposedRoot.HasValue && proposedRoot != mappedAniListIdValue && !keepMapping)
                 {
-                    var mappedMedia = await _apiService.GetAniListAnimeAsync(mapping.anilist_id.Value);
+                    var mappedMedia = await _apiService.GetAniListAnimeAsync(mappedAniListIdValue);
                     var rootMedia = await _apiService.GetAniListAnimeAsync(proposedRoot.Value);
 
                     int? plexYear = plexMatchData.Year;
@@ -193,8 +223,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     bool haveYear = plexYear.HasValue && (mappedYear.HasValue || rootYear.HasValue);
                     if (haveYear)
                     {
-                        var mappedDelta = mappedYear.HasValue ? Math.Abs(mappedYear.Value - plexYear!.Value) : int.MaxValue;
-                        var rootDelta = rootYear.HasValue ? Math.Abs(rootYear.Value - plexYear!.Value) : int.MaxValue;
+                        var targetYear = plexYear.GetValueOrDefault();
+                        var mappedDelta = mappedYear.HasValue ? Math.Abs(mappedYear.Value - targetYear) : int.MaxValue;
+                        var rootDelta = rootYear.HasValue ? Math.Abs(rootYear.Value - targetYear) : int.MaxValue;
 
                         if (mappedDelta <= rootDelta)
                         {
@@ -217,7 +248,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     }
 
                     // Try to realign mapping using the chosen AniList ID if TVDB matches
-                    if (rootAniListId != mapping.anilist_id)
+                    if (rootAniListId.HasValue && rootAniListId != mapping.anilist_id)
                     {
                         var rootMapping = _animeListMapper.GetMappingByAniListId(rootAniListId.Value);
                         if (rootMapping != null && rootMapping.thetvdb_id.HasValue && mapping.thetvdb_id.HasValue &&
@@ -287,8 +318,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     var useRoot = true;
                     if (plexYear.HasValue && mappedYear.HasValue && rootYear.HasValue)
                     {
-                        var diffMapped = Math.Abs(mappedYear.Value - plexYear.Value);
-                        var diffRoot = Math.Abs(rootYear.Value - plexYear.Value);
+                        var targetYear = plexYear.Value;
+                        var diffMapped = Math.Abs(mappedYear.Value - targetYear);
+                        var diffRoot = Math.Abs(rootYear.Value - targetYear);
                         useRoot = diffRoot <= diffMapped;
                     }
 
@@ -458,6 +490,70 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             var filtered = _tagFilterService.FilterTags(tagBuckets);
             _tagFilterService.LogFilteredTags(_logger, tagBuckets, filtered);
             return filtered;
+        }
+
+        private async Task<long?> FindBestPrequelRootAsync(long startAniListId, int targetYear)
+        {
+            var visited = new HashSet<long>();
+            var queue = new Queue<long>();
+            queue.Enqueue(startAniListId);
+
+            long? bestId = startAniListId;
+            int bestScore = int.MaxValue;
+
+            while (queue.Count > 0)
+            {
+                var currentId = queue.Dequeue();
+                if (!visited.Add(currentId))
+                {
+                    continue;
+                }
+
+                var media = await _apiService.GetAniListAnimeAsync(currentId);
+                if (media == null)
+                {
+                    continue;
+                }
+
+                int score = ScoreAniListMedia(media, targetYear);
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    bestId = media.Id;
+                }
+
+                var prequels = media.Relations?.Edges?
+                    .Where(e => string.Equals(e.RelationType, "PREQUEL", StringComparison.OrdinalIgnoreCase))
+                    .Select(e => e.Node?.Id)
+                    .Where(id => id.HasValue)
+                    .Select(id => (long)id!.Value) ?? Enumerable.Empty<long>();
+
+                foreach (var prequelId in prequels)
+                {
+                    if (!visited.Contains(prequelId))
+                    {
+                        queue.Enqueue(prequelId);
+                    }
+                }
+            }
+
+            return bestId;
+        }
+
+        private int ScoreAniListMedia(AniListMedia media, int targetYear)
+        {
+            int year = media.StartDate?.Year ?? media.Relations?.Edges?
+                .Select(e => e.Node?.SeasonYear)
+                .FirstOrDefault(y => y.HasValue) ?? 0;
+
+            int yearDelta = year > 0 ? Math.Abs(year - targetYear) : 50;
+
+            var format = media.Format ?? string.Empty;
+            bool isMovie = format.Equals("MOVIE", StringComparison.OrdinalIgnoreCase)
+                           || (media.Duration.HasValue && media.Duration.Value > 60 && !_longEpisodeAniListIds.Contains(media.Id));
+
+            int formatPenalty = isMovie ? 5 : 0;
+            return yearDelta * 10 + formatPenalty;
         }
 
         // ... rest of your existing helper methods (GetConfiguredTitle, GetConfiguredOriginalTitle, etc.) remain the same ...
