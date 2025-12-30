@@ -51,6 +51,12 @@
 ## 1.0.4.5 - 2025-12-29
 - Rebuild with corrected manifest checksum so Jellyfin auto-update installs cleanly.
 
+## 1.0.4.6 - 2025-12-30
+- Add a manual mapping override for “True Beauty (2024)” (AniList 152184 / MAL 57192) to cover missing TVDB/IMDb in Fribb.
+
+## 1.0.4.7 - 2025-12-30
+- Rebuild with the True Beauty manual mapping included and assembly/file versions at 1.0.4.7.
+
 ## 1.0.2.2 - 2025-12-21
 - Skip processing when .plexmatch is missing; log a clear banner and exit.
 
