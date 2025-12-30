@@ -92,6 +92,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             21175,  // Dragon Ball Super
             170083  // Dragon Ball Daima
         };
+        private static readonly List<AnimeMapping> _manualMappings = new()
+        {
+            // Fribb missing TVDB/IMDb: True Beauty (2024)
+            new AnimeMapping
+            {
+                thetvdb_id = 442363,
+                imdb_id = "tt33054444",
+                anilist_id = 152184,
+                mal_id = 57192,
+                type = "ONA"
+            }
+        };
 
         public static bool ShouldDeferSeasonToTvdb(long baseAniListId, int seasonNumber)
         {
@@ -151,12 +163,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             AnimeMapping? mapping = null;
             if (!string.IsNullOrEmpty(plexMatchData.TvdbId))
             {
-                mapping = _animeListMapper.GetMappingByTvdbId(plexMatchData.TvdbId);
+                mapping = _manualMappings.FirstOrDefault(m => m.thetvdb_id.HasValue && m.thetvdb_id.Value.ToString() == plexMatchData.TvdbId)
+                    ?? _animeListMapper.GetMappingByTvdbId(plexMatchData.TvdbId);
             }
 
             if (mapping == null && !string.IsNullOrEmpty(plexMatchData.ImdbId))
             {
-                mapping = _animeListMapper.GetMappingByImdbId(plexMatchData.ImdbId);
+                mapping = _manualMappings.FirstOrDefault(m => string.Equals(m.imdb_id, plexMatchData.ImdbId, StringComparison.OrdinalIgnoreCase))
+                    ?? _animeListMapper.GetMappingByImdbId(plexMatchData.ImdbId);
             }
 
             if (mapping == null)
