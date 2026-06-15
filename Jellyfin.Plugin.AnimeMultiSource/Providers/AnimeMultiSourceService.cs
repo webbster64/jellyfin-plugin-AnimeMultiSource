@@ -304,17 +304,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             _logger.LogInformation("=== SERVICE COMPLETED CALL #{CallId} ===", callId);
 
             // Create combined metadata
-            return await CreateCombinedMetadata(plexMatchData, mapping, jikanData, aniListData, rootAniListId, effectiveMalId, config);
+            return await CreateCombinedMetadata(plexMatchData, mapping, jikanData, aniListData, rootAniListId, effectiveMalId, config, info.MetadataLanguage);
         }
 
         private async Task<AnimeMetadata> CreateCombinedMetadata(
-            PlexMatchData plexMatchData, 
+            PlexMatchData plexMatchData,
             AnimeMapping mapping,
             JikanAnime? jikanData,
             AniListMedia? aniListData,
             long? rootAniListId,
             long? effectiveMalId,
-            Configuration.PluginConfiguration config)
+            Configuration.PluginConfiguration config,
+            string? metadataLanguage)
         {
             // Prefer root AniList media when mapping points at a sequel/spin-off stage.
             AniListMedia? aniListPrimary = aniListData;
@@ -374,7 +375,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             // Apply configuration for Title and OriginalTitle selection
-            metadata.Title = GetConfiguredTitle(primaryJikan, aniListPrimary, config);
+            metadata.Title = GetConfiguredTitle(primaryJikan, aniListPrimary, config, metadataLanguage);
             metadata.OriginalTitle = GetConfiguredOriginalTitle(primaryJikan, aniListPrimary, config);
 
             // Status from Jikan
@@ -571,18 +572,41 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         }
 
         // ... rest of your existing helper methods (GetConfiguredTitle, GetConfiguredOriginalTitle, etc.) remain the same ...
-        private string GetConfiguredTitle(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config)
+        private static Configuration.TitleFieldType TitleFieldFromLanguage(string? language) =>
+            language?.ToLowerInvariant() switch
+            {
+                "en" => Configuration.TitleFieldType.TitleEnglish,
+                "ja" => Configuration.TitleFieldType.TitleJapanese,
+                _ => Configuration.TitleFieldType.Title
+            };
+
+        private string GetConfiguredTitle(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config, string? metadataLanguage)
         {
-            // If we have configuration for title, use it
-            var title = GetTitleFromSource(jikanData, aniListData, config.TitleField, config.TitleDataSource);
-            return title ?? jikanData?.Title ?? aniListData?.Title?.Romaji ?? "Unknown Title";
+            var languageField = TitleFieldFromLanguage(metadataLanguage);
+
+            // 1. Try configured source+field.
+            // 2. Try same configured field from any source.
+            // 3. Try library language field from any source.
+            // 4. Last resort: any title.
+            return GetTitleFromSource(jikanData, aniListData, config.TitleField, config.TitleDataSource)
+                ?? GetTitleFromJikan(jikanData, config.TitleField)
+                ?? GetTitleFromAniList(aniListData, config.TitleField)
+                ?? GetTitleFromJikan(jikanData, languageField)
+                ?? GetTitleFromAniList(aniListData, languageField)
+                ?? jikanData?.Title
+                ?? aniListData?.Title?.Romaji
+                ?? "Unknown Title";
         }
 
         private string GetConfiguredOriginalTitle(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config)
         {
-            // If we have configuration for original title, use it
-            var originalTitle = GetOriginalTitleFromSource(jikanData, aniListData, config.OriginalTitleField, config.OriginalTitleDataSource);
-            return originalTitle ?? jikanData?.TitleJapanese ?? aniListData?.Title?.Native ?? string.Empty;
+            // Try configured source+field first, then same field from other sources, then any original title.
+            return GetOriginalTitleFromSource(jikanData, aniListData, config.OriginalTitleField, config.OriginalTitleDataSource)
+                ?? GetOriginalTitleFromJikan(jikanData, config.OriginalTitleField)
+                ?? GetOriginalTitleFromAniList(aniListData, config.OriginalTitleField)
+                ?? jikanData?.TitleJapanese
+                ?? aniListData?.Title?.Native
+                ?? string.Empty;
         }
 
         private int? GetConfiguredRuntime(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config)
