@@ -139,8 +139,38 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public long? anisearch_id { get; set; }
 
-        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
-        public long? themoviedb_id { get; set; }
+        [JsonPropertyName("themoviedb_id")]
+        public JsonElement? themoviedb_id { get; set; }
+
+        [JsonIgnore]
+        public long? PreferredTmdbId
+        {
+            get
+            {
+                if (themoviedb_id == null)
+                    return null;
+
+                var value = themoviedb_id.Value;
+
+                if (value.ValueKind == JsonValueKind.Number)
+                    return value.GetInt64();
+
+                if (value.ValueKind == JsonValueKind.String &&
+                    long.TryParse(value.GetString(), out var id))
+                    return id;
+
+                if (value.ValueKind == JsonValueKind.Object)
+                {
+                    if (value.TryGetProperty("tv", out var tv))
+                        return tv.GetInt64();
+
+                    if (value.TryGetProperty("movie", out var movie))
+                        return movie.GetInt64();
+                }
+
+                return null;
+            }
+        }
 
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public long? kitsu_id { get; set; }

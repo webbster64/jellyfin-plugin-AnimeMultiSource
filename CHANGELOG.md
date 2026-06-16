@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4.9 - 2026-06-16
+- Enhanced `AnimeMapping` to robustly handle `themoviedb_id` field from Fribb anime-lists (supports numbers, strings, and nested `{"tv": ..., "movie": ...}` objects) via new `PreferredTmdbId` property.
+- Fixed title fallback to respect configured language preference (PR #6 by @theflanman). Thanks for the contribution!
+- Cleaned up tag filtering by adding deprecated/low-quality tags to be ignored
+
 ## 1.0.4.8 - 2026-01-27
 - Accept Fribb anime-lists `tvdb_id` field (with legacy `thetvdb_id` fallback) so TVDB mappings load again and .plexmatch lookups resolve.
 

@@ -63,6 +63,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "season",
             "josei",
             "shounen",
+            "twin -- TO BE DELETED",
             "improvised weapons -- TO BE SPLIT AND DELETED",
             "obsessive -- DO NOT USE -- TO BE SPLIT AND DELETED",
             "sexual abuse -- TO BE SPLIT AND DELETED",
@@ -73,7 +74,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             "gun - TO BE SPLIT AND DELETED",
             "unusual weapons -- TO BE SPLIT AND DELETED",
             "RPG aspects",
+            "regeneration from death -- TO BE SPLIT AND REMOVED",
+            "non-blood-related siblings -- DO NOT USE -- TO BE DELETED",
+            "recycled animation -- TO BE SPLIT AND DELETED",
+            "combat butler -- DO NOT ADD -- TO BE SPLIT AND DELETED",
+            "DESCRIPTION MISSING",
             "medieval -- TO BE SPLIT AND DELETED",
+            "censored uncensored version",
+            "DESCRIPTION NEEDS IMPROVEMENT",
             "maintenance tags"
         };
 
