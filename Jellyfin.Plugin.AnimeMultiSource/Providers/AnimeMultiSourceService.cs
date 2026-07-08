@@ -98,7 +98,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             new AnimeMapping
             {
                 tvdb_id = 442363,
-                imdb_id = "tt33054444",
+                imdb_id = ["tt33054444"],
                 anilist_id = 152184,
                 mal_id = 57192,
                 type = "ONA"
@@ -169,7 +169,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             if (mapping == null && !string.IsNullOrEmpty(plexMatchData.ImdbId))
             {
-                mapping = _manualMappings.FirstOrDefault(m => string.Equals(m.imdb_id, plexMatchData.ImdbId, StringComparison.OrdinalIgnoreCase))
+                mapping = _manualMappings.FirstOrDefault(m =>
+                    m.imdb_id.Any(id =>
+                        string.Equals(id, plexMatchData.ImdbId, StringComparison.OrdinalIgnoreCase)))
                     ?? _animeListMapper.GetMappingByImdbId(plexMatchData.ImdbId);
             }
 

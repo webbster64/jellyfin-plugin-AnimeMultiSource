@@ -52,9 +52,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     ?? new Dictionary<string, AnimeMapping>();
 
                 _mappingsByImdb = mappings?
-                    .Where(x => !string.IsNullOrEmpty(x.imdb_id))
-                    .GroupBy(x => x.imdb_id!)
-                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g))
+                    .SelectMany(m => m.imdb_id.Select(id => (id, m)))
+                    .Where(x => !string.IsNullOrEmpty(x.id))
+                    .GroupBy(x => x.id)
+                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g.Select(x => x.m)))
                     ?? new Dictionary<string, AnimeMapping>();
 
                 _mappingsByAniList = mappings?
@@ -134,7 +135,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         [JsonIgnore]
         public long? TvdbId => tvdb_id ?? thetvdb_id;
 
-        public string? imdb_id { get; set; }
+        public string[] imdb_id { get; set; } = [];
 
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public long? anisearch_id { get; set; }
