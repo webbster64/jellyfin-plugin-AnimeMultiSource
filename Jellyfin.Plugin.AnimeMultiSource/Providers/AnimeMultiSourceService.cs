@@ -364,7 +364,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 AniSearchId = mapping.anisearch_id?.ToString(),
                 KitsuId = mapping.kitsu_id?.ToString(),
                 MalId = effectiveMalId?.ToString(),
-                TheMovieDbId = mapping.themoviedb_id?.ToString(),
+                TheMovieDbId = mapping.PreferredTmdbId?.ToString(),
                 Type = mapping.type,
                 AnimePlanetId = mapping.animeplanet_id
             };
