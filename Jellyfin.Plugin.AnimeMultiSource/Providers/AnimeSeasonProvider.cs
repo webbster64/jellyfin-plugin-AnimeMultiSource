@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.Globalization;
 using MediaBrowser.Model.Providers;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.AnimeMultiSource.Configuration;
@@ -20,11 +21,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly PlexMatchParser _plexMatchParser;
         private readonly AnimeListMapper _animeListMapper;
         private readonly TagFilterService _tagFilterService;
+        private readonly ILocalizationManager _localization;
         private PluginConfiguration _config;
 
-        public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger)
+        public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger, ILocalizationManager localization)
         {
             _logger = logger;
+            _localization = localization;
             _config = Plugin.GetConfigurationSafe(_logger);
 
             var httpClientHandler = new HttpClientHandler
@@ -48,14 +51,22 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             _logger.LogInformation("=== SEASON PROVIDER CALL for: {SeasonName} (Season {SeasonNumber}, Path: {Path}) ===",
                 info.Name, info.IndexNumber, info.Path);
 
-            if (!info.IndexNumber.HasValue || info.IndexNumber.Value < 0)
+            // Jellyfin's own folder parsing only understands English "Season N"/"S1" names, so
+            // libraries using a localized season folder (e.g. French "Saison 1") arrive here with
+            // no IndexNumber at all. Fall back to parsing the season folder name ourselves before
+            // giving up.
+            var resolvedSeasonNumber = info.IndexNumber
+                ?? SeasonNumberParser.TryParse(Path.GetFileName(info.Path?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)))
+                ?? SeasonNumberParser.TryParse(info.Name);
+
+            if (!resolvedSeasonNumber.HasValue || resolvedSeasonNumber.Value < 0)
             {
                 _logger.LogDebug("Skipping season metadata: invalid season number for {Name}", info.Name);
                 return result;
             }
 
             var baseAniListId = await ResolveRootAniListIdAsync(info);
-            var seasonNumber = info.IndexNumber.Value;
+            var seasonNumber = resolvedSeasonNumber.Value;
             if (!baseAniListId.HasValue)
             {
                 _logger.LogWarning("Skipping season metadata: unable to resolve AniList root id for {Name}", info.Name);
@@ -76,7 +87,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             {
                 if (_config.SeasonTitleFormat == SeasonTitleFormatType.Numbered)
                 {
-                    var seasonNameFallback = seasonNumber <= 0 ? "Specials" : $"Season {seasonNumber}";
+                    var seasonNameFallback = seasonNumber <= 0 ? "Specials" : GetLocalizedSeasonNumberName(seasonNumber);
                     var sortNameFallback = $"Season {seasonNumber:00}";
                     _logger.LogWarning(
                         "No season detail found for {Name} S{SeasonNumber} (AniList base {AniListId}); applying numbered fallback title",
@@ -277,11 +288,28 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return false;
         }
 
+        // Uses Jellyfin's own "NameSeasonNumber" localized format string (e.g. "Season {0}" in
+        // English, "Saison {0}" in French) so numbered season titles follow the server's
+        // configured display language instead of always being English.
+        private string GetLocalizedSeasonNumberName(int seasonNumber)
+        {
+            try
+            {
+                var format = _localization.GetLocalizedString("NameSeasonNumber");
+                return string.Format(System.Globalization.CultureInfo.InvariantCulture, format, seasonNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to localize season name for season {SeasonNumber}; using English fallback", seasonNumber);
+                return $"Season {seasonNumber}";
+            }
+        }
+
         private string GetSeasonName(ApiService.AniListSeasonDetail seasonDetail, int seasonNumber, string fallbackName)
         {
             if (_config.SeasonTitleFormat == SeasonTitleFormatType.Numbered)
             {
-                return seasonNumber <= 0 ? "Specials" : $"Season {seasonNumber}";
+                return seasonNumber <= 0 ? "Specials" : GetLocalizedSeasonNumberName(seasonNumber);
             }
 
             return seasonDetail.TitleEnglish

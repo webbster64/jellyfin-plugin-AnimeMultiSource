@@ -57,15 +57,22 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 return result;
             }
 
-            var engTranslation = await _tvdbClient.GetEpisodeTranslationAsync(tvdbEpisode.Id, "eng", cancellationToken);
+            // Prefer a translation in the library's configured metadata language; fall back to
+            // English, then to TVDB's untranslated base fields.
+            var preferredLanguage = MapToTvdbLanguageCode(info.MetadataLanguage);
+            var translation = await _tvdbClient.GetEpisodeTranslationAsync(tvdbEpisode.Id, preferredLanguage, cancellationToken);
+            if (translation == null && !string.Equals(preferredLanguage, "eng", StringComparison.OrdinalIgnoreCase))
+            {
+                translation = await _tvdbClient.GetEpisodeTranslationAsync(tvdbEpisode.Id, "eng", cancellationToken);
+            }
 
             var episode = new Episode
             {
-                Name = engTranslation?.Name ?? tvdbEpisode.Name ?? info.Name,
+                Name = translation?.Name ?? tvdbEpisode.Name ?? info.Name,
                 OriginalTitle = tvdbEpisode.Name,
                 IndexNumber = tvdbEpisode.Number ?? info.IndexNumber,
                 ParentIndexNumber = tvdbEpisode.SeasonNumber ?? info.ParentIndexNumber,
-                Overview = engTranslation?.Overview ?? tvdbEpisode.Overview
+                Overview = translation?.Overview ?? tvdbEpisode.Overview
             };
 
             if (DateTime.TryParse(tvdbEpisode.Aired, out var airDate))
@@ -101,6 +108,46 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
             return _tvdbClient.GetImageAsync(url, cancellationToken);
+        }
+
+        // TVDB v4 translations use 3-letter (ISO 639-2/B) language codes; Jellyfin's configured
+        // metadata language is a 2-letter (ISO 639-1) code. Covers the languages TVDB commonly
+        // has episode translations for; unmapped/unset languages fall back to English.
+        private static string MapToTvdbLanguageCode(string? metadataLanguage)
+        {
+            if (string.IsNullOrWhiteSpace(metadataLanguage))
+            {
+                return "eng";
+            }
+
+            return metadataLanguage.Trim().ToLowerInvariant() switch
+            {
+                "en" => "eng",
+                "fr" => "fra",
+                "de" => "deu",
+                "es" => "spa",
+                "it" => "ita",
+                "pt" => "por",
+                "ja" => "jpn",
+                "ko" => "kor",
+                "zh" => "zho",
+                "ru" => "rus",
+                "nl" => "nld",
+                "pl" => "pol",
+                "tr" => "tur",
+                "ar" => "ara",
+                "sv" => "swe",
+                "da" => "dan",
+                "no" => "nor",
+                "fi" => "fin",
+                "el" => "ell",
+                "he" => "heb",
+                "hu" => "hun",
+                "cs" => "ces",
+                "ro" => "ron",
+                "uk" => "ukr",
+                _ => "eng"
+            };
         }
 
         private bool TryGetTvdbSeriesId(EpisodeInfo info, out int seriesId)

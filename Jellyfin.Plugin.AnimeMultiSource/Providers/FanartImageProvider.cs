@@ -7,7 +7,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text.RegularExpressions;
 using Jellyfin.Plugin.AnimeMultiSource.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
@@ -219,25 +218,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         private int? TryParseSeasonNumber(string? name)
         {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return null;
-            }
-
-            // Match patterns like "Season 1", "S1", "Season 02"
-            var match = Regex.Match(name, @"(?:Season|S)\s*(\d+)", RegexOptions.IgnoreCase);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out var number))
-            {
-                return number;
-            }
-
-            // Handle "Specials" as season 0
-            if (name.Trim().Equals("Specials", StringComparison.OrdinalIgnoreCase))
-            {
-                return 0;
-            }
-
-            return null;
+            return SeasonNumberParser.TryParse(name);
         }
 
         private async Task<List<RemoteImageInfo>> ToImageInfosAsync(IEnumerable<FanartImage> source, ImageType type, CancellationToken cancellationToken)
