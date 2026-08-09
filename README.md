@@ -43,6 +43,11 @@ Open **Dashboard -> Plugins -> Anime Multi Source**:
 - Configure backdrop limits/quality and enable/disable sources as desired.
 - Approved genres: prefilled with a curated list; edit or clear as needed (one genre per line).
 
+### Metadata and image providers
+- In your anime library settings, leave only **Anime Multi Source** enabled under both **Metadata downloaders** and **Image fetchers**. It replaces the other anime metadata and artwork providers, including TVDB and Fanart.
+- Disable separate AniDB and AniList plugins to prevent them from adding duplicate provider IDs to your items.
+- **Missing Episode Fetcher** can remain enabled. If it causes unexpected results, disable it and report the problem.
+
 ## Rate limits & caching
 - AniList: spaced to ~30 req/min; cached 5 days; persisted on disk.
 - AniDB: soft daily cap with slow mode; ban/limit responses trigger backoff; cached 5 days; persisted on disk.
