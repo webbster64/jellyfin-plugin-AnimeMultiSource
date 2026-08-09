@@ -175,6 +175,24 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     ?? _animeListMapper.GetMappingByImdbId(plexMatchData.ImdbId);
             }
 
+            // Direct AniList/MAL anchor: lets .plexmatch identify titles Fribb hasn't
+            // cross-referenced to a TVDB/IMDb id yet (e.g. brand-new simulcasts).
+            if (mapping == null && plexMatchData.AniListId.HasValue)
+            {
+                mapping = _animeListMapper.GetMappingByAniListId(plexMatchData.AniListId.Value)
+                    ?? new AnimeMapping { anilist_id = plexMatchData.AniListId.Value };
+                _logger.LogInformation("Resolved series '{Title}' via .plexmatch anilistid {AniListId} (no TVDB/IMDb id needed)",
+                    plexMatchData.Title, plexMatchData.AniListId);
+            }
+
+            if (mapping == null && plexMatchData.MalId.HasValue)
+            {
+                mapping = _animeListMapper.GetMappingByMalId(plexMatchData.MalId.Value)
+                    ?? new AnimeMapping { mal_id = plexMatchData.MalId.Value };
+                _logger.LogInformation("Resolved series '{Title}' via .plexmatch malid {MalId} (no TVDB/IMDb id needed)",
+                    plexMatchData.Title, plexMatchData.MalId);
+            }
+
             if (mapping == null)
             {
                 _logger.LogWarning("No mapping found for series '{Title}'", plexMatchData.Title);

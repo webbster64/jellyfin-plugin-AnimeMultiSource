@@ -15,6 +15,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource
 
         // URLs
         public const string FribbAnimeListsUrl = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
+        public const string AnimeOfflineDatabaseUrl = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-offline-database-reduced.json";
 
         // File names
         public const string PlexMatchFileName = ".plexmatch";

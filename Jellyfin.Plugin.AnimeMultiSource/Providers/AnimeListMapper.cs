@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -14,27 +15,36 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger _logger;
-        private Dictionary<string, AnimeMapping> _mappingsByTvdb;
-        private Dictionary<string, AnimeMapping> _mappingsByImdb;
-        private Dictionary<long, AnimeMapping> _mappingsByAniList;
-        private DateTime _lastUpdated;
+        private static Dictionary<string, AnimeMapping> _mappingsByTvdb = new();
+        private static Dictionary<string, AnimeMapping> _mappingsByImdb = new();
+        private static Dictionary<long, AnimeMapping> _mappingsByAniList = new();
+        private static Dictionary<long, AnimeMapping> _mappingsByMal = new();
+        private static DateTime _lastUpdated = DateTime.MinValue;
+        private static readonly SemaphoreSlim LoadLock = new(1, 1);
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(Constants.AnimeListCacheHours);
 
         public AnimeListMapper(HttpClient httpClient, ILogger logger)
         {
             _httpClient = httpClient;
             _logger = logger;
-            _mappingsByTvdb = new Dictionary<string, AnimeMapping>();
-            _mappingsByImdb = new Dictionary<string, AnimeMapping>();
-            _mappingsByAniList = new Dictionary<long, AnimeMapping>();
         }
 
         public async Task LoadAnimeListsAsync()
         {
+            if (DateTime.UtcNow - _lastUpdated < CacheDuration)
+            {
+                return;
+            }
+
+            await LoadLock.WaitAsync();
             try
             {
-                _logger.LogInformation("Loading anime lists from Fribb...");
+                if (DateTime.UtcNow - _lastUpdated < CacheDuration)
+                {
+                    return;
+                }
 
-                var json = await _httpClient.GetStringAsync(Constants.FribbAnimeListsUrl);
+                _logger.LogInformation("Loading anime lists from Fribb...");
 
                 var options = new JsonSerializerOptions
                 {
@@ -42,29 +52,43 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     PropertyNameCaseInsensitive = true
                 };
 
+                var json = await _httpClient.GetStringAsync(Constants.FribbAnimeListsUrl);
                 var mappings = JsonSerializer.Deserialize<List<AnimeMapping>>(json, options);
 
                 // Handle duplicates by taking the first occurrence
-                _mappingsByTvdb = mappings?
+                var mappingsByTvdb = mappings?
                     .Where(x => x.TvdbId.HasValue)
                     .GroupBy(x => x.TvdbId!.Value.ToString(CultureInfo.InvariantCulture))
                     .ToDictionary(g => g.Key, g => SelectPreferredMapping(g)) // Prefer TV over OVA/OVA specials for duplicates
                     ?? new Dictionary<string, AnimeMapping>();
 
-                _mappingsByImdb = mappings?
+                var mappingsByImdb = mappings?
                     .SelectMany(m => m.imdb_id.Select(id => (id, m)))
                     .Where(x => !string.IsNullOrEmpty(x.id))
                     .GroupBy(x => x.id)
                     .ToDictionary(g => g.Key, g => SelectPreferredMapping(g.Select(x => x.m)))
                     ?? new Dictionary<string, AnimeMapping>();
 
-                _mappingsByAniList = mappings?
+                var mappingsByAniList = mappings?
                     .Where(x => x.anilist_id.HasValue)
                     .GroupBy(x => x.anilist_id!.Value)
                     .ToDictionary(g => g.Key, g => SelectPreferredMapping(g))
                     ?? new Dictionary<long, AnimeMapping>();
 
+                var mappingsByMal = mappings?
+                    .Where(x => x.mal_id.HasValue)
+                    .GroupBy(x => x.mal_id!.Value)
+                    .ToDictionary(g => g.Key, g => SelectPreferredMapping(g))
+                    ?? new Dictionary<long, AnimeMapping>();
+
+                await BackfillFromOfflineDatabaseAsync(mappingsByAniList);
+
+                _mappingsByTvdb = mappingsByTvdb;
+                _mappingsByImdb = mappingsByImdb;
+                _mappingsByAniList = mappingsByAniList;
+                _mappingsByMal = mappingsByMal;
                 _lastUpdated = DateTime.UtcNow;
+
                 _logger.LogInformation("Loaded {Count} anime mappings with {TvdbCount} TVDB entries and {ImdbCount} IMDb entries",
                     mappings?.Count ?? 0, _mappingsByTvdb.Count, _mappingsByImdb.Count);
             }
@@ -72,6 +96,79 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             {
                 _logger.LogError(ex, "Failed to load anime lists");
                 throw;
+            }
+            finally
+            {
+                LoadLock.Release();
+            }
+        }
+
+        // Fribb's list sometimes lacks anidb/kitsu/anisearch/livechart ids for very new titles
+        // it hasn't cross-referenced yet. Backfill those specific gaps (never overwrite what
+        // Fribb already has) from Fribb's own copy of manami-project/anime-offline-database,
+        // which shares this exact schema.
+        private async Task BackfillFromOfflineDatabaseAsync(Dictionary<long, AnimeMapping> mappingsByAniList)
+        {
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var json = await _httpClient.GetStringAsync(Constants.AnimeOfflineDatabaseUrl);
+                var supplemental = JsonSerializer.Deserialize<List<AnimeMapping>>(json, options);
+                if (supplemental == null)
+                {
+                    return;
+                }
+
+                var backfilled = 0;
+                foreach (var entry in supplemental)
+                {
+                    if (!entry.anilist_id.HasValue || !mappingsByAniList.TryGetValue(entry.anilist_id.Value, out var existing))
+                    {
+                        continue;
+                    }
+
+                    var changed = false;
+                    if (!existing.anidb_id.HasValue && entry.anidb_id.HasValue)
+                    {
+                        existing.anidb_id = entry.anidb_id;
+                        changed = true;
+                    }
+
+                    if (!existing.kitsu_id.HasValue && entry.kitsu_id.HasValue)
+                    {
+                        existing.kitsu_id = entry.kitsu_id;
+                        changed = true;
+                    }
+
+                    if (!existing.anisearch_id.HasValue && entry.anisearch_id.HasValue)
+                    {
+                        existing.anisearch_id = entry.anisearch_id;
+                        changed = true;
+                    }
+
+                    if (!existing.livechart_id.HasValue && entry.livechart_id.HasValue)
+                    {
+                        existing.livechart_id = entry.livechart_id;
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        backfilled++;
+                    }
+                }
+
+                _logger.LogInformation("Backfilled {Count} anime mappings from anime-offline-database", backfilled);
+            }
+            catch (Exception ex)
+            {
+                // Purely supplemental; Fribb's list alone is enough to keep working.
+                _logger.LogWarning(ex, "Failed to load anime-offline-database backfill; continuing with Fribb data only");
             }
         }
 
@@ -88,6 +185,11 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public AnimeMapping? GetMappingByAniListId(long aniListId)
         {
             return _mappingsByAniList.TryGetValue(aniListId, out var mapping) ? mapping : null;
+        }
+
+        public AnimeMapping? GetMappingByMalId(long malId)
+        {
+            return _mappingsByMal.TryGetValue(malId, out var mapping) ? mapping : null;
         }
 
         private AnimeMapping SelectPreferredMapping(IEnumerable<AnimeMapping> group)
