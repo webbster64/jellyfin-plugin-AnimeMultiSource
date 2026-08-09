@@ -126,6 +126,23 @@
                         <div class="fieldDescription">Choose an aspect ratio filter for backdrops.</div>
                     </div>
 
+                    <!-- AnimeSchedule.net -->
+                    <h2>AnimeSchedule.net (Upcoming episodes)</h2>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="animeScheduleApiKey">API Key</label>
+                        <input id="animeScheduleApiKey" name="animeScheduleApiKey" type="password" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription">Optional. Get a token from your animeschedule.net account settings (API tab). When set, upcoming episode air dates are pulled from AnimeSchedule.net so more of your library shows up under Jellyfin's "Upcoming" tab. Leave blank to disable.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="animeScheduleMode">Schedule</label>
+                        <select is="emby-select" id="animeScheduleMode" name="animeScheduleMode" class="emby-select-withcolor emby-select">
+                            <option value="Combined">Combined (prefer dub, fall back to sub)</option>
+                            <option value="Sub">Sub only</option>
+                            <option value="Dub">Dub only</option>
+                        </select>
+                        <div class="fieldDescription">Which airing schedule to use for upcoming episode dates.</div>
+                    </div>
+
                     <!-- Content Configuration -->
                     <h2>Content Configuration</h2>
                     <div class="textareaContainer">
@@ -211,6 +228,10 @@
                         // Limits
                         document.getElementById('chkAniDbRateLimit').value = config.AniDbRateLimit;
 
+                        // AnimeSchedule.net
+                        document.getElementById('animeScheduleApiKey').value = config.AnimeScheduleApiKey || '';
+                        document.getElementById('animeScheduleMode').value = config.AnimeScheduleMode || 'Combined';
+
                         Dashboard.hideLoadingMsg();
                     });
                 },
@@ -247,6 +268,10 @@
 
                         // Limits
                         config.AniDbRateLimit = document.getElementById('chkAniDbRateLimit').value;
+
+                        // AnimeSchedule.net
+                        config.AnimeScheduleApiKey = document.getElementById('animeScheduleApiKey').value;
+                        config.AnimeScheduleMode = document.getElementById('animeScheduleMode').value;
 
                         ApiClient.updatePluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);

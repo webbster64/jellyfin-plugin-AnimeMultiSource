@@ -44,6 +44,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Configuration
         PreferJikan
     }
 
+    public enum AnimeScheduleModeType
+    {
+        Sub,
+        Dub,
+        Combined
+    }
+
     public class PluginConfiguration : BasePluginConfiguration
     {
         public PluginConfiguration()
@@ -123,6 +130,10 @@ Action";
             BackdropMinWidth = 1920;
             BackdropMinHeight = 1080;
             BackdropMinAspectRatio = 1.78;
+
+            // AnimeSchedule.net
+            AnimeScheduleApiKey = string.Empty;
+            AnimeScheduleMode = AnimeScheduleModeType.Combined;
         }
 
         // Existing properties
@@ -158,5 +169,9 @@ Action";
         public int BackdropMinWidth { get; set; }
         public int BackdropMinHeight { get; set; }
         public double BackdropMinAspectRatio { get; set; }
+
+        // AnimeSchedule.net
+        public string AnimeScheduleApiKey { get; set; }
+        public AnimeScheduleModeType AnimeScheduleMode { get; set; }
     }
 }
