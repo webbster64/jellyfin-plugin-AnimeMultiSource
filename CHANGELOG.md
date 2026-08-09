@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.6.1 - 2026-08-09
+- Merged PR #15 (fix malformed TMDB provider IDs from Fribb mappings), PR #12 (Romaji original title option), and PR #13 (README clarification) - thanks @Soitora!
+- `.plexmatch` now accepts `anilistid`/`malid` overrides so titles Fribb hasn't cross-referenced to a TVDB/IMDb id yet can still resolve.
+- Backfill missing AniDB/Kitsu/AniSearch/LiveChart ids from `manami-project/anime-offline-database` when Fribb's own list doesn't have them yet.
+- Season folders named in other languages (e.g. French "Saison 1") now resolve instead of being skipped; numbered season titles follow Jellyfin's configured display language; TVDB episode translations follow the library's metadata language instead of always English.
+- New optional AnimeSchedule.net integration: populates Jellyfin's "Upcoming" tab with real sub/dub-aware air dates (Sub/Dub/Combined), and serves as an extra title/overview/id fallback when Jikan/AniList/Fribb come up short. Fully opt-in via a personal API key in plugin settings.
+- Fixed a bug where the plugin cached its configuration once at startup and silently ignored settings changes made afterward without a full process restart.
+
 ## 1.0.4.9 - 2026-06-16
 - Enhanced `AnimeMapping` to robustly handle `themoviedb_id` field from Fribb anime-lists (supports numbers, strings, and nested `{"tv": ..., "movie": ...}` objects) via new `PreferredTmdbId` property.
 - Fixed title fallback to respect configured language preference (PR #6 by @theflanman). Thanks for the contribution!
