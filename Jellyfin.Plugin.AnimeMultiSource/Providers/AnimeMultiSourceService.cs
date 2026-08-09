@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading; // Add this for Interlocked
 using System.Threading.Tasks;
 using MediaBrowser.Controller.Entities; // For PersonInfo
@@ -65,6 +66,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly AnimeListMapper _animeListMapper;
         private readonly ApiService _apiService;
         private readonly TagFilterService _tagFilterService;
+        private readonly System.Net.Http.HttpClient _httpClient;
         private static readonly HashSet<long> _keepAniListMappingIds = new()
         {
             // Known cases where the sequel/spin-off must not be realigned to a different root
@@ -124,6 +126,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             };
             
             var httpClient = new System.Net.Http.HttpClient(httpClientHandler);
+            _httpClient = httpClient;
             _animeListMapper = new AnimeListMapper(httpClient, logger);
             _apiService = new ApiService(httpClient, logger);
         }
@@ -197,6 +200,39 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             {
                 _logger.LogWarning("No mapping found for series '{Title}'", plexMatchData.Title);
                 return null;
+            }
+
+            // Fribb sometimes has an anidb_id but hasn't cross-referenced anilist_id/mal_id yet for
+            // a title. AnimeSchedule.net maintains its own independent AniDB/AniList/MAL cross-links
+            // (when the user has configured a key) - use it to backfill whichever ids Fribb is
+            // missing before we give up on AniList-driven enrichment (titles, seasons, tags, etc).
+            _logger.LogInformation(
+                "AnimeSchedule backfill check for '{Title}': anilist_id={AniListId}, anidb_id={AniDbId}, AnimeScheduleApiKey configured={HasKey} (len={KeyLen})",
+                plexMatchData.Title, mapping.anilist_id, mapping.anidb_id, !string.IsNullOrWhiteSpace(config.AnimeScheduleApiKey), config.AnimeScheduleApiKey?.Length ?? 0);
+
+            if (!mapping.anilist_id.HasValue && mapping.anidb_id.HasValue && !string.IsNullOrWhiteSpace(config.AnimeScheduleApiKey))
+            {
+                try
+                {
+                    var scheduleClient = new AnimeScheduleClient(_httpClient, _logger, config.AnimeScheduleApiKey);
+                    var scheduleDetail = await scheduleClient.GetAnimeDetailByAniDbIdAsync(mapping.anidb_id.Value);
+                    _logger.LogInformation(
+                        "AnimeSchedule lookup for AniDB {AniDbId} returned: detail null={DetailNull}, AniList={AniListId}, MAL={MalId}",
+                        mapping.anidb_id, scheduleDetail == null, scheduleDetail?.AniListId, scheduleDetail?.MalId);
+
+                    if (scheduleDetail?.AniListId.HasValue == true || scheduleDetail?.MalId.HasValue == true)
+                    {
+                        mapping.anilist_id ??= scheduleDetail.AniListId;
+                        mapping.mal_id ??= scheduleDetail.MalId;
+                        _logger.LogInformation(
+                            "Backfilled ids from AnimeSchedule for AniDB {AniDbId}: AniList {AniListId}, MAL {MalId}",
+                            mapping.anidb_id, mapping.anilist_id, mapping.mal_id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to backfill ids from AnimeSchedule for AniDB id {AniDbId}", mapping.anidb_id);
+                }
             }
 
             _logger.LogInformation("Successfully mapped series '{Title}' to anime with AniDB: {AniDbId}, AniList: {AniListId}, MAL: {MalId}",
@@ -395,7 +431,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             // Apply configuration for Title and OriginalTitle selection
-            metadata.Title = GetConfiguredTitle(primaryJikan, aniListPrimary, config, metadataLanguage);
+            metadata.Title = await GetConfiguredTitle(primaryJikan, aniListPrimary, config, metadataLanguage, mapping.anidb_id, rootAniListId, plexMatchData.Title);
             metadata.OriginalTitle = GetConfiguredOriginalTitle(primaryJikan, aniListPrimary, config);
 
             // Status from Jikan
@@ -404,8 +440,16 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             // Community Rating - convert AniList score (0-100) to 0-10 scale
             metadata.CommunityRating = primaryJikan?.Score ?? (aniListPrimary?.AverageScore / 10.0);
 
-            // Overview - prefer Jikan, fallback to AniList
+            // Overview - prefer Jikan, fallback to AniList, then AnimeSchedule.net (when configured)
             metadata.Overview = primaryJikan?.Synopsis ?? aniListPrimary?.Description;
+            if (string.IsNullOrWhiteSpace(metadata.Overview) && rootAniListId.HasValue)
+            {
+                var scheduleDetail = await GetAnimeScheduleDetailAsync(config, rootAniListId.Value);
+                if (!string.IsNullOrWhiteSpace(scheduleDetail?.Description))
+                {
+                    metadata.Overview = StripAnimeScheduleHtml(scheduleDetail!.Description!);
+                }
+            }
 
             // Dates from Jikan
             metadata.ReleaseDate = primaryJikan?.Aired?.From;
@@ -600,7 +644,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 _ => Configuration.TitleFieldType.Title
             };
 
-        private string GetConfiguredTitle(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config, string? metadataLanguage)
+        private async Task<string> GetConfiguredTitle(
+            JikanAnime? jikanData,
+            AniListMedia? aniListData,
+            Configuration.PluginConfiguration config,
+            string? metadataLanguage,
+            long? aniDbId,
+            long? aniListId,
+            string? fallbackTitle)
         {
             var languageField = TitleFieldFromLanguage(metadataLanguage);
 
@@ -608,14 +659,82 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             // 2. Try same configured field from any source.
             // 3. Try library language field from any source.
             // 4. Last resort: any title.
-            return GetTitleFromSource(jikanData, aniListData, config.TitleField, config.TitleDataSource)
+            var title = GetTitleFromSource(jikanData, aniListData, config.TitleField, config.TitleDataSource)
                 ?? GetTitleFromJikan(jikanData, config.TitleField)
                 ?? GetTitleFromAniList(aniListData, config.TitleField)
                 ?? GetTitleFromJikan(jikanData, languageField)
                 ?? GetTitleFromAniList(aniListData, languageField)
                 ?? jikanData?.Title
-                ?? aniListData?.Title?.Romaji
-                ?? "Unknown Title";
+                ?? aniListData?.Title?.Romaji;
+
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                return title;
+            }
+
+            // Neither Jikan nor AniList had any data - typically because the Fribb mapping is
+            // missing anilist_id/mal_id for a title it hasn't fully cross-referenced yet, even
+            // though it matched via TVDB/IMDb/AniDB. Prefer AnimeSchedule.net when the user has
+            // configured a key (a curated third vendor, and quicker/more reliable than AniDB's
+            // own rate-limited API); fall back to AniDB's own title otherwise/next.
+            if (aniListId.HasValue && !string.IsNullOrWhiteSpace(config.AnimeScheduleApiKey))
+            {
+                var scheduleDetail = await GetAnimeScheduleDetailAsync(config, aniListId.Value);
+                var scheduleTitle = scheduleDetail?.Names?.English
+                    ?? scheduleDetail?.Names?.Romaji
+                    ?? scheduleDetail?.Names?.Native;
+                if (!string.IsNullOrWhiteSpace(scheduleTitle))
+                {
+                    return scheduleTitle;
+                }
+            }
+
+            if (aniDbId.HasValue)
+            {
+                try
+                {
+                    var aniDbTitle = await _apiService.GetAniDbMainTitleAsync(
+                        aniDbId.Value, config.AniDbClientName, config.AniDbClientVersion, config.AniDbRateLimit);
+                    if (!string.IsNullOrWhiteSpace(aniDbTitle))
+                    {
+                        return aniDbTitle;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to fetch AniDB fallback title for AniDB id {AniDbId}", aniDbId);
+                }
+            }
+
+            return !string.IsNullOrWhiteSpace(fallbackTitle) ? fallbackTitle : "Unknown Title";
+        }
+
+        // Shared by title/overview fallback tiers; cheap to call more than once since
+        // AnimeScheduleClient caches by AniList id internally.
+        private async Task<AnimeScheduleClient.AnimeDetail?> GetAnimeScheduleDetailAsync(Configuration.PluginConfiguration config, long aniListId)
+        {
+            if (string.IsNullOrWhiteSpace(config.AnimeScheduleApiKey))
+            {
+                return null;
+            }
+
+            try
+            {
+                var client = new AnimeScheduleClient(_httpClient, _logger, config.AnimeScheduleApiKey);
+                return await client.GetAnimeDetailByAniListIdAsync(aniListId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to fetch AnimeSchedule detail for AniList id {AniListId}", aniListId);
+                return null;
+            }
+        }
+
+        private static string StripAnimeScheduleHtml(string input)
+        {
+            var text = Regex.Replace(input, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<.*?>", string.Empty);
+            return System.Net.WebUtility.HtmlDecode(text).Trim();
         }
 
         private string GetConfiguredOriginalTitle(JikanAnime? jikanData, AniListMedia? aniListData, Configuration.PluginConfiguration config)

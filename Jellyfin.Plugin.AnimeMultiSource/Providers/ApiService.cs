@@ -57,7 +57,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private static DateTimeOffset _aniDbBanUntil = DateTimeOffset.MinValue;
         private static string _aniDbBanReason = string.Empty;
         private static readonly TimeSpan AniDbBanBackoff = TimeSpan.FromMinutes(15);
-        private const string VersionTag = "v0.0.1.3";
+        // Derived from the running assembly so it can never go stale like the old hardcoded
+        // "v0.0.1.3" did - a quick way to confirm which build's code is actually executing.
+        private static readonly string VersionTag = $"v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}";
 
         public ApiService(HttpClient httpClient, ILogger logger)
         {
@@ -866,6 +868,30 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             string clientVersion,
             int rateLimitMs = 2000)
         {
+            var data = await GetAniDbDataAsync(anidbId, clientName, clientVersion, rateLimitMs);
+            return data.Tags;
+        }
+
+        // Fallback title source for when neither Jikan nor AniList have data for a mapping
+        // (e.g. Fribb hasn't cross-referenced anilist_id/mal_id yet, but anidb_id is known).
+        // Shares the same cache entry as GetAniDbTagsAsync, so this is a free lookup whenever
+        // tags were already fetched for the same AniDB id.
+        public async Task<string?> GetAniDbMainTitleAsync(
+            long anidbId,
+            string clientName,
+            string clientVersion,
+            int rateLimitMs = 2000)
+        {
+            var data = await GetAniDbDataAsync(anidbId, clientName, clientVersion, rateLimitMs);
+            return data.MainTitle;
+        }
+
+        private async Task<(List<string> Tags, string? MainTitle)> GetAniDbDataAsync(
+            long anidbId,
+            string clientName,
+            string clientVersion,
+            int rateLimitMs = 2000)
+        {
             var now = DateTimeOffset.UtcNow;
 
             EnsurePersistentCacheLoaded();
@@ -874,18 +900,19 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 now - cached.CachedAt < AniDbCacheDuration)
             {
                 _logger.LogInformation("AniDB cache hit for ID {AniDbId} (age: {Age:F1} minutes)", anidbId, (now - cached.CachedAt).TotalMinutes);
-                return new List<string>(cached.Tags);
+                return (new List<string>(cached.Tags), cached.MainTitle);
             }
 
             if (IsAniDbTemporarilyBanned(out var remainingBan, out var banReason))
             {
                 _logger.LogWarning("AniDB requests paused until {BanUntil:u} (remaining {Remaining:F1} minutes) because {Reason}", now + remainingBan, remainingBan.TotalMinutes, banReason);
-                return new List<string>();
+                return (new List<string>(), null);
             }
 
             _aniDbCache.TryRemove(anidbId, out _);
 
             var tags = new List<string>();
+            string? mainTitle = null;
 
             try
             {
@@ -921,7 +948,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 {
                     var backoff = GetRetryAfterDelay(response, AniDbBanBackoff);
                     SetAniDbBan($"AniDB rate-limit response ({(int)response.StatusCode} {response.StatusCode})", backoff);
-                    return tags;
+                    return (tags, mainTitle);
                 }
 
                 if (response.IsSuccessStatusCode)
@@ -957,11 +984,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                         var snippet = xmlContent.Substring(0, Math.Min(xmlContent.Length, 160));
                         _logger.LogWarning("AniDB response looked like a ban/limit notice. First 160 chars: {Snippet}", snippet);
                         SetAniDbBan("AniDB response contained ban/limit notice", AniDbBanBackoff);
-                        return tags;
+                        return (tags, mainTitle);
                     }
 
                     // Parse XML response
                     var animeData = ParseAniDbXml(xmlContent);
+                    mainTitle = ExtractAniDbMainTitle(animeData);
+
                     if (animeData?.Tags?.TagList != null)
                     {
                         // Remove weight filter to get ALL tags, then filter through TagFilterService
@@ -978,15 +1007,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                         _tagFilterService.LogFilteredTags(_logger, allTags, tags);
 
                         _logger.LogDebug("Found {Count} filtered AniDB tags for ID {AniDbId}", tags.Count, anidbId);
-
-                        var cacheEntry = new AniDbCacheEntry(DateTimeOffset.UtcNow, new List<string>(tags));
-                        _aniDbCache[anidbId] = cacheEntry;
-                        _logger.LogInformation("AniDB cache stored for ID {AniDbId} with {TagCount} tags", anidbId, tags.Count);
-                        PersistCachesToDiskSafe();
                     }
                     else
                     {
                         _logger.LogWarning("No tags found in AniDB response for ID {AniDbId}", anidbId);
+                    }
+
+                    if (animeData != null)
+                    {
+                        var cacheEntry = new AniDbCacheEntry(DateTimeOffset.UtcNow, new List<string>(tags), mainTitle);
+                        _aniDbCache[anidbId] = cacheEntry;
+                        _logger.LogInformation("AniDB cache stored for ID {AniDbId} with {TagCount} tags and title '{MainTitle}'", anidbId, tags.Count, mainTitle);
+                        PersistCachesToDiskSafe();
                     }
                 }
                 else
@@ -1006,7 +1038,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 _logger.LogError(ex, "Error fetching AniDB tags for ID {AniDbId}", anidbId);
             }
 
-            return tags;
+            return (tags, mainTitle);
         }
 
         // Helper method to check if data is gzipped
@@ -1133,6 +1165,22 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     xmlContent.Substring(0, Math.Min(200, xmlContent.Length)));
                 return null;
             }
+        }
+
+        // AniDB lists several title variants per anime (type: main/official/short/synonym,
+        // language: x-jat/ja/en/...). "main" is AniDB's own canonical (romaji) title; fall back
+        // to an official English title, then to whatever title is present.
+        private static string? ExtractAniDbMainTitle(AniDbAnime? animeData)
+        {
+            var titles = animeData?.Titles?.TitleList;
+            if (titles == null || titles.Count == 0)
+            {
+                return null;
+            }
+
+            return titles.FirstOrDefault(t => string.Equals(t.Type, "main", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(t.Value))?.Value
+                ?? titles.FirstOrDefault(t => string.Equals(t.Type, "official", StringComparison.OrdinalIgnoreCase) && string.Equals(t.Language, "en", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(t.Value))?.Value
+                ?? titles.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.Value))?.Value;
         }
 
         private AniDbRateLimitContext GetAniDbRateLimitContext(int configuredRateLimitMs)
@@ -1669,7 +1717,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             public Dictionary<int, AniListCacheEntry<List<PersonInfo>>> AniListPeople { get; set; } = new();
         }
 
-        private sealed record AniDbCacheEntry(DateTimeOffset CachedAt, List<string> Tags);
+        private sealed record AniDbCacheEntry(DateTimeOffset CachedAt, List<string> Tags, string? MainTitle = null);
         private sealed record AniDbRateLimitContext(int EffectiveRateLimitMs, int RequestNumber, bool IsSlowMode, DateTime Date);
         private sealed record AniListCacheEntry<T>(DateTimeOffset CachedAt, T Data);
         public sealed class AniListSeasonDetail

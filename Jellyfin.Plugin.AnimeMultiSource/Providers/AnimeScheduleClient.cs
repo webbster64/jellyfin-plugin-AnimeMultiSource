@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,9 +20,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
     {
         private const string BaseUrl = "https://animeschedule.net/api/v3";
 
-        private static readonly TimeSpan RouteCacheDuration = TimeSpan.FromDays(7);
+        private static readonly TimeSpan AnimeDetailCacheDuration = TimeSpan.FromDays(7);
         private static readonly TimeSpan TimetableCacheDuration = TimeSpan.FromHours(6);
-        private static readonly ConcurrentDictionary<long, CacheEntry<string?>> RouteCache = new();
+        private static readonly ConcurrentDictionary<long, CacheEntry<AnimeDetail?>> AnimeDetailCache = new();
+        private static readonly ConcurrentDictionary<long, CacheEntry<AnimeDetail?>> AnimeDetailByAniDbCache = new();
         private static readonly ConcurrentDictionary<string, CacheEntry<List<TimetableEntry>>> TimetableCache = new();
         private static readonly object PersistentCacheLock = new();
         private static bool _persistentCacheLoaded;
@@ -48,6 +50,31 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         // entries, via GET /anime?anilist-ids={id} — a direct id lookup, no fuzzy title matching.
         public async Task<string?> GetRouteByAniListIdAsync(long aniListId)
         {
+            var detail = await GetAnimeDetailByAniListIdAsync(aniListId);
+            return detail?.Route;
+        }
+
+        // Same GET /anime?anilist-ids={id} lookup, but exposes the full anime record - AnimeSchedule
+        // curates its own title translations and (often Crunchyroll-sourced) synopsis, which is a
+        // useful third, independently-sourced fallback for title/overview resolution when both
+        // AniList and Jikan/MAL come up empty (e.g. an outage on one or both of them).
+        public Task<AnimeDetail?> GetAnimeDetailByAniListIdAsync(long aniListId)
+        {
+            return FetchAnimeDetailAsync($"anilist-ids={aniListId}", AnimeDetailCache, aniListId, "AniList", aniListId);
+        }
+
+        // GET /anime?anidb-ids={id} - AnimeSchedule maintains its own AniDB/AniList/MAL cross-links
+        // (via the "websites" field on the result), independent of Fribb/anime-lists. Useful as an
+        // ID backfill when a Fribb mapping has an anidb_id but is missing anilist_id/mal_id for a
+        // title it hasn't fully cross-referenced yet.
+        public Task<AnimeDetail?> GetAnimeDetailByAniDbIdAsync(long aniDbId)
+        {
+            return FetchAnimeDetailAsync($"anidb-ids={aniDbId}", AnimeDetailByAniDbCache, aniDbId, "AniDB", aniDbId);
+        }
+
+        private async Task<AnimeDetail?> FetchAnimeDetailAsync(
+            string queryParam, ConcurrentDictionary<long, CacheEntry<AnimeDetail?>> cache, long cacheKey, string idKindForLogging, long idForLogging)
+        {
             if (!IsConfigured)
             {
                 return null;
@@ -55,14 +82,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             EnsurePersistentCacheLoaded();
 
-            if (RouteCache.TryGetValue(aniListId, out var cached) && DateTimeOffset.UtcNow - cached.CachedAt < RouteCacheDuration)
+            if (cache.TryGetValue(cacheKey, out var cached) && DateTimeOffset.UtcNow - cached.CachedAt < AnimeDetailCacheDuration)
             {
                 return cached.Data;
             }
 
             try
             {
-                var url = $"{BaseUrl}/anime?anilist-ids={aniListId}";
+                var url = $"{BaseUrl}/anime?{queryParam}";
                 using var response = await SendAsync(url);
                 if (response == null || !response.IsSuccessStatusCode)
                 {
@@ -71,15 +98,15 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 var json = await response.Content.ReadAsStringAsync();
                 var page = JsonSerializer.Deserialize<AnimeSearchResponse>(json, _jsonOptions);
-                var route = page?.Anime?.FirstOrDefault()?.Route;
+                var detail = page?.Anime?.FirstOrDefault();
 
-                RouteCache[aniListId] = new CacheEntry<string?>(DateTimeOffset.UtcNow, route);
+                cache[cacheKey] = new CacheEntry<AnimeDetail?>(DateTimeOffset.UtcNow, detail);
                 PersistCacheToDiskSafe();
-                return route;
+                return detail;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "AnimeSchedule: failed to resolve route for AniList id {AniListId}", aniListId);
+                _logger.LogWarning(ex, "AnimeSchedule: failed to resolve anime detail for {IdKind} id {Id}", idKindForLogging, idForLogging);
                 return null;
             }
         }
@@ -175,11 +202,19 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             var now = DateTimeOffset.UtcNow;
-            foreach (var kvp in snapshot.Routes ?? new Dictionary<long, CacheEntry<string?>>())
+            foreach (var kvp in snapshot.AnimeDetails ?? new Dictionary<long, CacheEntry<AnimeDetail?>>())
             {
-                if (now - kvp.Value.CachedAt < RouteCacheDuration)
+                if (now - kvp.Value.CachedAt < AnimeDetailCacheDuration)
                 {
-                    RouteCache[kvp.Key] = kvp.Value;
+                    AnimeDetailCache[kvp.Key] = kvp.Value;
+                }
+            }
+
+            foreach (var kvp in snapshot.AnimeDetailsByAniDb ?? new Dictionary<long, CacheEntry<AnimeDetail?>>())
+            {
+                if (now - kvp.Value.CachedAt < AnimeDetailCacheDuration)
+                {
+                    AnimeDetailByAniDbCache[kvp.Key] = kvp.Value;
                 }
             }
 
@@ -198,7 +233,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             {
                 var snapshot = new CacheSnapshot
                 {
-                    Routes = RouteCache.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    AnimeDetails = AnimeDetailCache.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    AnimeDetailsByAniDb = AnimeDetailByAniDbCache.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     Timetables = TimetableCache.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                 };
 
@@ -262,20 +298,79 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         private sealed class CacheSnapshot
         {
-            public Dictionary<long, CacheEntry<string?>>? Routes { get; set; }
+            public Dictionary<long, CacheEntry<AnimeDetail?>>? AnimeDetails { get; set; }
+            public Dictionary<long, CacheEntry<AnimeDetail?>>? AnimeDetailsByAniDb { get; set; }
             public Dictionary<string, CacheEntry<List<TimetableEntry>>>? Timetables { get; set; }
         }
 
         private sealed class AnimeSearchResponse
         {
             [JsonPropertyName("anime")]
-            public List<AnimeSearchResult>? Anime { get; set; }
+            public List<AnimeDetail>? Anime { get; set; }
         }
 
-        private sealed class AnimeSearchResult
+        public sealed class AnimeDetail
         {
             [JsonPropertyName("route")]
             public string? Route { get; set; }
+
+            [JsonPropertyName("names")]
+            public AnimeNames? Names { get; set; }
+
+            [JsonPropertyName("description")]
+            public string? Description { get; set; }
+
+            [JsonPropertyName("websites")]
+            public AnimeWebsites? Websites { get; set; }
+
+            // AnimeSchedule's website links are full URLs ("myanimelist.net/anime/61240/...",
+            // "anidb.net/anime/19226", "anilist.co/anime/188139/..."), not raw ids - pull the
+            // numeric id that follows "/anime/" out of each one.
+            [JsonIgnore]
+            public long? MalId => ExtractAnimeId(Websites?.Mal);
+
+            [JsonIgnore]
+            public long? AniListId => ExtractAnimeId(Websites?.AniList);
+
+            [JsonIgnore]
+            public long? AniDbId => ExtractAnimeId(Websites?.AniDb);
+
+            private static readonly Regex AnimeIdPattern = new(@"/anime/(\d+)", RegexOptions.Compiled);
+
+            private static long? ExtractAnimeId(string? url)
+            {
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    return null;
+                }
+
+                var match = AnimeIdPattern.Match(url);
+                return match.Success && long.TryParse(match.Groups[1].Value, out var id) ? id : null;
+            }
+        }
+
+        public sealed class AnimeWebsites
+        {
+            [JsonPropertyName("mal")]
+            public string? Mal { get; set; }
+
+            [JsonPropertyName("aniList")]
+            public string? AniList { get; set; }
+
+            [JsonPropertyName("anidb")]
+            public string? AniDb { get; set; }
+        }
+
+        public sealed class AnimeNames
+        {
+            [JsonPropertyName("romaji")]
+            public string? Romaji { get; set; }
+
+            [JsonPropertyName("english")]
+            public string? English { get; set; }
+
+            [JsonPropertyName("native")]
+            public string? Native { get; set; }
         }
 
         public sealed class TimetableEntry
