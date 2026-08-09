@@ -16,7 +16,6 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
     {
         private readonly ILogger<AnimeMultiSourceProvider> _logger;
         private readonly AnimeMultiSourceService _animeService;
-        private readonly Configuration.PluginConfiguration _config;
 
         // Add a static counter to track how many times the provider is called
         private static int _callCount = 0;
@@ -24,7 +23,6 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public AnimeMultiSourceProvider(ILogger<AnimeMultiSourceProvider> logger)
         {
             _logger = logger;
-            _config = Plugin.GetConfigurationSafe(_logger);
 
             // Create service with simplified dependency chain
             _animeService = new AnimeMultiSourceService(logger);
@@ -35,18 +33,24 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         public async Task<MetadataResult<Series>> GetMetadata(SeriesInfo info, CancellationToken cancellationToken)
         {
             var callId = Interlocked.Increment(ref _callCount);
-            _logger.LogInformation("=== METADATA PROVIDER CALL #{CallId} for: {Name} (Path: {Path}) ===",
-                callId, info.Name, info.Path);
+            var assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            _logger.LogInformation("=== METADATA PROVIDER CALL #{CallId} v{Version} for: {Name} (Path: {Path}) ===",
+                callId, assemblyVersion, info.Name, info.Path);
 
             // Log the SeriesInfo properties to understand what's different between calls
             _logger.LogDebug("SeriesInfo details - Name: {Name}, Path: {Path}, Year: {Year}, IsAutomated: {IsAutomated}",
                 info.Name, info.Path, info.Year, info.IsAutomated);
 
+            // Re-fetch config on every call (matches AnimeSeasonProvider) instead of caching it
+            // once at construction - this provider is long-lived, so a stale/default config
+            // captured at startup would otherwise never pick up settings saved afterward.
+            var config = Plugin.GetConfigurationSafe(_logger);
+
             var result = new MetadataResult<Series>();
 
             try
             {
-                var metadata = await _animeService.GetMetadataForSeries(info, _config);
+                var metadata = await _animeService.GetMetadataForSeries(info, config);
                 if (metadata == null)
                 {
                     _logger.LogDebug("No metadata found for {Path}", info.Path);
