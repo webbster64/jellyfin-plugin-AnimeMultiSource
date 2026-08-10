@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6.5 - 2026-08-10
+- Self-heals stale plugin version folders: Jellyfin's plugin updater installs a new version alongside the old one instead of replacing it ([jellyfin/jellyfin#12959](https://github.com/jellyfin/jellyfin/issues/12959)), which can cause both to load at once and break configuration load/save, requiring a manual SSH cleanup after every update. This plugin now deletes its own stale version folders automatically on startup.
+- Recovers your configuration directly from disk instead of silently resetting it to defaults if it ever does hit that type-cast conflict.
+- README updated to cover AnimeSchedule.net setup, `.plexmatch` `anilistid`/`malid` overrides, localized season folders, the scheduled task, and this fix.
+
 ## 1.0.6.4 - 2026-08-10
 - Fixed the actual reason AnimeSchedule virtual episodes never showed up in Upcoming: they were never persisted (`AddChild` alone only updates the in-memory tree) and had no explicit `Id`. Fixed to match `jellyfin-plugin-tvdb`'s own approach.
 - Stopped TVDB from immediately overwriting the correct air date on new virtual episodes (the previous persistence fix used `QueueRefresh`, which re-triggers the full metadata-provider pipeline including TVDB - now persisted directly instead).
