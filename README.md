@@ -3,19 +3,23 @@
 Remote anime metadata, tags, artwork and people for Jellyfin using multiple sources (AniList, AniDB, Jikan/MAL, TVDB, Fanart.tv, Fribb mappings and .plexmatch files). Built for large libraries with cautious rate limiting and persistent caching.
 
 ## Features
-- Multi-source IDs: resolves AniList, AniDB, MAL, TVDB, TMDB, IMDb, Kitsu, AniSearch via Fribb mappings + optional `.plexmatch` overrides.
+- Multi-source IDs: resolves AniList, AniDB, MAL, TVDB, TMDB, IMDb, Kitsu, AniSearch via Fribb mappings + optional `.plexmatch` overrides. Backfills gaps in Fribb's data from `manami-project/anime-offline-database` and (optionally) AnimeSchedule.net, for titles Fribb hasn't fully cross-referenced yet.
 - Metadata: titles, descriptions, genres, studios, scores, relations/seasons, people (voice actors/staff), tags (AniDB).
 - Images: fanart.tv + TVDB backdrops, posters, logos, season art with quality filters and limits.
+- Upcoming episodes: optional AnimeSchedule.net integration populates Jellyfin's built-in "Upcoming" tab with real sub/dub-aware air dates. See [AnimeSchedule.net (Upcoming episodes)](#animeschedulenet-upcoming-episodes) below.
+- Localized libraries: season folders named in other languages (e.g. French "Saison 1") resolve correctly; numbered season titles and TVDB episode translations follow Jellyfin's configured display language.
 - Rate limits & backoff: AniList (30/min), Jikan (spacing + retry-after), AniDB (soft cap with backoff and ban detection).
 - Persistent caches: AniDB and AniList responses cached up to 5 days and persisted to disk to survive restarts.
 
 ## Requirements
-- Jellyfin 10.11.2+ (net9.0 plugin, ABI 10.11.2.0)
-- API keys (optional but recommended):
-  - Fanart.tv personal API key
+- Jellyfin 10.11.3+ (net9.0 plugin, ABI 10.11.3.0)
+- API keys (all optional but recommended):
+  - Fanart.tv personal API key (logos/backdrops)
+  - AnimeSchedule.net API key (Upcoming episodes; get one from your AnimeSchedule.net account settings, API tab)
 
 ### .plexmatch files (strongly recommended)
-- The plugin honors `.plexmatch` files to improve ID resolution (title/year/TVDB/IMDb overrides). These files prevent mis-matches on tricky titles, remasters, and specials.
+- The plugin honors `.plexmatch` files to improve ID resolution. Supported fields: `title`, `year`, `tvdbid`, `imdbid`, and `anilistid`/`malid`.
+- `anilistid`/`malid` let a series resolve directly off AniList/MAL even when Fribb hasn't cross-referenced it to a TVDB/IMDb id yet (common for brand-new simulcasts) - add one of these instead of `tvdbid`/`imdbid` for those titles.
 - Sonarr can generate `.plexmatch` automatically: go to **Settings → Metadata**, enable **Plex**, and tick the option to write `.plexmatch` files.
 - If you already have `.plexmatch` files in your library, keep them alongside the series folders—no further setup needed.
 
@@ -47,6 +51,15 @@ Open **Dashboard -> Plugins -> Anime Multi Source**:
 - In your anime library settings, leave only **Anime Multi Source** enabled under both **Metadata downloaders** and **Image fetchers**. It replaces the other anime metadata and artwork providers, including TVDB and Fanart.
 - Disable separate AniDB and AniList plugins to prevent them from adding duplicate provider IDs to your items.
 - **Missing Episode Fetcher** can remain enabled. If it causes unexpected results, disable it and report the problem.
+
+### AnimeSchedule.net (Upcoming episodes)
+Optional. Adds mapped anime to Jellyfin's built-in **Upcoming** tab (`Shows → Upcoming`) with real air dates, and backstops title/overview/id resolution when Fribb/Jikan/AniList come up short for a title.
+
+1) Get an API key from your AnimeSchedule.net account settings (API tab).
+2) Enter it under **Dashboard → Plugins → Anime Multi Source → AnimeSchedule.net**, and choose a schedule: **Sub**, **Dub**, or **Combined** (prefers dub, falls back to sub per-episode if no dub exists).
+3) Leave the key blank to disable the feature entirely - nothing else changes.
+
+Upcoming episodes refresh whenever a series is refreshed, and on a scheduled task (**Dashboard → Scheduled Tasks → Anime Multi Source → Refresh AnimeSchedule Upcoming Episodes**, every 8 hours by default) so schedule delays/reschedules that happen between refreshes still get picked up. Episode titles show as `TBA` - AnimeSchedule is a scheduling calendar, not an episode database, so no title is ever fabricated.
 
 ## Rate limits & caching
 - AniList: spaced to ~30 req/min; cached 5 days; persisted on disk.
