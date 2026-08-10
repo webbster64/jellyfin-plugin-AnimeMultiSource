@@ -61,6 +61,9 @@ Optional. Adds mapped anime to Jellyfin's built-in **Upcoming** tab (`Shows → 
 
 Upcoming episodes refresh whenever a series is refreshed, and on a scheduled task (**Dashboard → Scheduled Tasks → Anime Multi Source → Refresh AnimeSchedule Upcoming Episodes**, every 8 hours by default) so schedule delays/reschedules that happen between refreshes still get picked up. Episode titles show as `TBA` - AnimeSchedule is a scheduling calendar, not an episode database, so no title is ever fabricated.
 
+### Refresh Recently-Aired Anime Tags
+A newly-aired anime's AniDB/MAL tags and genres are often thin at first - community tagging takes time to catch up. This scheduled task (**Dashboard → Scheduled Tasks → Anime Multi Source → Refresh Recently-Aired Anime Tags**, runs daily) automatically re-checks a series' full metadata about a week, then again about 3 months, after its last episode was added, so tags improve on their own without a manual refresh.
+
 ## Rate limits & caching
 - AniList: spaced to ~30 req/min; cached 5 days; persisted on disk.
 - AniDB: soft daily cap with slow mode; ban/limit responses trigger backoff; cached 5 days; persisted on disk.

@@ -208,6 +208,31 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return null;
         }
 
+        // A franchise's root AniList entry (season 1) reports its OWN status - almost always
+        // "FINISHED" for anything but a brand new show, even when a much later season is
+        // currently airing. Walks the strict, direct SEQUEL-relation-only chain (never the fuzzy
+        // side-story/alternative-format fallback used elsewhere) to whatever the latest known
+        // entry is, so callers that need "is this franchise actually still going" - like the
+        // series-level Status field - aren't stuck reading season 1's own long-stale verdict.
+        public async Task<AniListSeasonDetail?> GetLatestSeasonDetailAsync(int rootAniListId)
+        {
+            var visited = new HashSet<int> { rootAniListId };
+            var current = await GetAniListSeasonDetailAsync(rootAniListId);
+
+            while (current?.SequelAniListId is int nextId && visited.Add(nextId))
+            {
+                var next = await GetAniListSeasonDetailAsync(nextId);
+                if (next == null)
+                {
+                    break;
+                }
+
+                current = next;
+            }
+
+            return current;
+        }
+
         public async Task<AniListSeasonDetail?> GetAniListSeasonDetailAsync(int aniListId, bool forceRefresh = false)
         {
             if (!forceRefresh && TryGetAniListCache(_aniListSeasonCache, aniListId, "season", out AniListSeasonDetail cached))
@@ -556,6 +581,24 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 "finished airing" => "Ended",
                 "not yet aired" => "Not yet released",
                 _ => jikanStatus ?? "Unknown"
+            };
+        }
+
+        // Fallback for when Jikan has no usable status for a title (e.g. incomplete MAL mapping) -
+        // AniList's own status is used instead of silently defaulting to "not yet released", which
+        // is obviously wrong for a show that already has downloaded/aired episodes in the library.
+        public string MapAniListStatus(string? aniListStatus)
+        {
+            return aniListStatus?.ToUpperInvariant() switch
+            {
+                "RELEASING" => "Continuing",
+                "FINISHED" => "Ended",
+                "NOT_YET_RELEASED" => "Not yet released",
+                "CANCELLED" => "Ended",
+                // Between seasons/cours, not permanently over - matches how this plugin already
+                // treats long hiatuses elsewhere (e.g. Devil Is a Part-Timer, 2013 -> 2022).
+                "HIATUS" => "Continuing",
+                _ => aniListStatus ?? "Unknown"
             };
         }
 

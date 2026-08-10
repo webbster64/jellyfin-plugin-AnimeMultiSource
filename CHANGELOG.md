@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.6.14 - 2026-08-10
+- Fixed AnimeSchedule Upcoming skipping multi-season anime with a newer season not yet foldered locally (e.g. Re:Zero's part 4): now detects a confirmed next season via AniList's strict `SEQUEL` relation and creates the missing season/episodes for it.
+- Fixed a duplicate/`TBA`-episode bug caused by an unreliable episode lookup (`season.Children` instead of a real `GetEpisodes()` query).
+- Fixed a compounding bug where a wrongly-created virtual season got reused as "the current season" on the next run, building an even-more-wrong one on top of it each time.
+- Fixed wrong season numbers for franchises where AniList's sequel-relation hop count doesn't match real-world season numbering (e.g. a "Part 2" cour split that doesn't get its own season number) - the season number is now derived from AnimeSchedule's own route naming instead, handling both `-4` and `-2nd-season` style routes.
+- Fixed episodes landing in the wrong season for franchises where AniList doesn't split seasons the same way local folders do - a real, already-foldered season is now always preferred over a guessed number.
+- Stopped gating AnimeSchedule checks on `Series.Status == Ended`: that field is TVDB/Jikan-sourced and unreliable for anime, and was observed skipping a currently-airing show entirely.
+- Fixed `Series.Status` defaulting to "Not yet released" for a title already in the library whenever Jikan/MAL had no usable status data; now falls back to AniList's own status, with a safer "Continuing" default if both come up empty.
+- Fixed `Series.Status` showing "Ended" for a franchise whose first season finished years ago while a later season is currently airing - now checks AniList's latest known season in the sequel chain before settling on Ended.
+- New scheduled task, "Refresh Recently-Aired Anime Tags": re-checks tags/genres/status about a week, then again about 3 months, after a series' last episode was added, since AniDB/MAL community tagging takes time to catch up after a new season starts airing.
+
 ## 1.0.6.5 - 2026-08-10
 - Self-heals stale plugin version folders: Jellyfin's plugin updater installs a new version alongside the old one instead of replacing it ([jellyfin/jellyfin#12959](https://github.com/jellyfin/jellyfin/issues/12959)), which can cause both to load at once and break configuration load/save, requiring a manual SSH cleanup after every update. This plugin now deletes its own stale version folders automatically on startup.
 - Recovers your configuration directly from disk instead of silently resetting it to defaults if it ever does hit that type-cast conflict.

@@ -434,8 +434,30 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             metadata.Title = await GetConfiguredTitle(primaryJikan, aniListPrimary, config, metadataLanguage, mapping.anidb_id, rootAniListId, plexMatchData.Title);
             metadata.OriginalTitle = GetConfiguredOriginalTitle(primaryJikan, aniListPrimary, config);
 
-            // Status from Jikan
+            // Status from Jikan, falling back to AniList's own status when Jikan has nothing usable
+            // (e.g. an incomplete MAL mapping) - avoids defaulting to "not yet released" for a show
+            // that's actually already aired and been downloaded.
             metadata.Status = _apiService.MapJikanStatus(primaryJikan?.Status);
+            if (metadata.Status == "Unknown")
+            {
+                metadata.Status = _apiService.MapAniListStatus(aniListPrimary?.Status);
+            }
+
+            // Both Jikan and AniList's root/season-1 entry report THEIR OWN status, which for a
+            // multi-season franchise is almost always "finished" even while a much later season is
+            // still airing (Jellyfin just may not have a season folder for it yet). If the verdict
+            // so far says Ended, double check by walking AniList's strict SEQUEL chain to whatever
+            // the latest known entry is and prefer its status when that's still ongoing - this only
+            // ever corrects a false "Ended", never overrides a genuinely correct one.
+            if (metadata.Status == "Ended" && rootAniListId.HasValue)
+            {
+                var latestSeasonDetail = await _apiService.GetLatestSeasonDetailAsync((int)rootAniListId.Value);
+                var latestStatus = _apiService.MapAniListStatus(latestSeasonDetail?.Status);
+                if (latestStatus == "Continuing")
+                {
+                    metadata.Status = latestStatus;
+                }
+            }
 
             // Community Rating - convert AniList score (0-100) to 0-10 scale
             metadata.CommunityRating = primaryJikan?.Score ?? (aniListPrimary?.AverageScore / 10.0);

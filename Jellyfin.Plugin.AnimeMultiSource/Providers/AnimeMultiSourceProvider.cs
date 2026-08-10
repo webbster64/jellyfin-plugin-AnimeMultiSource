@@ -135,7 +135,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 "continuing" => SeriesStatus.Continuing,
                 "ended" => SeriesStatus.Ended,
                 "not yet released" => SeriesStatus.Unreleased,
-                _ => SeriesStatus.Unreleased
+                // Genuinely unknown (both Jikan and AniList came up empty) - "Continuing" is the
+                // safer default than "Unreleased", since this only runs for a title already in the
+                // library (a truly unreleased show wouldn't have files to scan in the first place).
+                _ => SeriesStatus.Continuing
             };
         }
 
