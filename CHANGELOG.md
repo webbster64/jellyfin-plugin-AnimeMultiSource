@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.6.4 - 2026-08-10
+- Fixed the actual reason AnimeSchedule virtual episodes never showed up in Upcoming: they were never persisted (`AddChild` alone only updates the in-memory tree) and had no explicit `Id`. Fixed to match `jellyfin-plugin-tvdb`'s own approach.
+- Stopped TVDB from immediately overwriting the correct air date on new virtual episodes (the previous persistence fix used `QueueRefresh`, which re-triggers the full metadata-provider pipeline including TVDB - now persisted directly instead).
+- Creates a virtual Season 1 when a series has no season yet (Sonarr doesn't create a season folder until its first episode airs - exactly when Upcoming is most useful).
+- Episode names are now `TBA` instead of a fabricated `Episode N`; extended the timetable lookahead from 2 to 4 weeks.
+- New scheduled task ("Refresh AnimeSchedule Upcoming Episodes", every 8 hours by default) that walks the whole library independent of series refreshes, to catch schedule delays/reschedules between refreshes.
+- Fixed `AnimeMultiSourceProvider` caching plugin configuration once at startup instead of re-reading it on every call.
+
 ## 1.0.6.1 - 2026-08-09
 - Merged PR #15 (fix malformed TMDB provider IDs from Fribb mappings), PR #12 (Romaji original title option), and PR #13 (README clarification) - thanks @Soitora!
 - `.plexmatch` now accepts `anilistid`/`malid` overrides so titles Fribb hasn't cross-referenced to a TVDB/IMDb id yet can still resolve.
