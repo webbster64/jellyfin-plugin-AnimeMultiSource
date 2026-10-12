@@ -255,24 +255,45 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 var value = themoviedb_id.Value;
 
-                if (value.ValueKind == JsonValueKind.Number)
-                    return value.GetInt64();
-
-                if (value.ValueKind == JsonValueKind.String &&
-                    long.TryParse(value.GetString(), out var id))
-                    return id;
-
                 if (value.ValueKind == JsonValueKind.Object)
                 {
                     if (value.TryGetProperty("tv", out var tv))
-                        return tv.GetInt64();
+                        return ReadTmdbIds(tv).FirstOrDefault() is var tvId && tvId > 0 ? tvId : null;
 
                     if (value.TryGetProperty("movie", out var movie))
-                        return movie.GetInt64();
+                        return ReadTmdbIds(movie).FirstOrDefault() is var movieId && movieId > 0 ? movieId : null;
+
+                    return null;
                 }
 
-                return null;
+                return ReadTmdbIds(value).FirstOrDefault() is var id && id > 0 ? id : null;
             }
+        }
+
+        // Fribb has shipped TMDb ids as a bare number, a numeric string, and (current format for
+        // movies) an array of numbers, e.g. {"movie": [372058]}; accept all three instead of throwing
+        // on the array.
+        private static List<long> ReadTmdbIds(JsonElement value)
+        {
+            var ids = new List<long>();
+            switch (value.ValueKind)
+            {
+                case JsonValueKind.Number when value.TryGetInt64(out var number):
+                    ids.Add(number);
+                    break;
+                case JsonValueKind.String when long.TryParse(value.GetString(), out var parsed):
+                    ids.Add(parsed);
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var element in value.EnumerateArray())
+                    {
+                        ids.AddRange(ReadTmdbIds(element));
+                    }
+
+                    break;
+            }
+
+            return ids;
         }
 
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
