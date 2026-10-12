@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -563,14 +564,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         {
             if (string.IsNullOrEmpty(duration)) return null;
 
-            // Jikan returns duration like "24 min per ep", we just want the number
-            var match = System.Text.RegularExpressions.Regex.Match(duration, @"(\d+)\s*min");
-            if (match.Success)
+            // Jikan returns duration like "24 min per ep" for series, but "1 hr 46 min" or "2 hr"
+            // for movies - count the hours too instead of reading "1 hr 46 min" as 46 minutes.
+            var hours = System.Text.RegularExpressions.Regex.Match(duration, @"(\d+)\s*hr");
+            var minutes = System.Text.RegularExpressions.Regex.Match(duration, @"(\d+)\s*min");
+            if (!hours.Success && !minutes.Success)
             {
-                return match.Groups[1].Value;
+                return null;
             }
 
-            return null;
+            var total = (hours.Success ? int.Parse(hours.Groups[1].Value, CultureInfo.InvariantCulture) * 60 : 0)
+                + (minutes.Success ? int.Parse(minutes.Groups[1].Value, CultureInfo.InvariantCulture) : 0);
+            return total.ToString(CultureInfo.InvariantCulture);
         }
 
         public string MapJikanStatus(string? jikanStatus)
