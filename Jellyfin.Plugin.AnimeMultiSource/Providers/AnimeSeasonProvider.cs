@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data.Enums;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Globalization;
@@ -22,12 +26,14 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private readonly AnimeListMapper _animeListMapper;
         private readonly TagFilterService _tagFilterService;
         private readonly ILocalizationManager _localization;
+        private readonly ILibraryManager _libraryManager;
         private PluginConfiguration _config;
 
-        public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger, ILocalizationManager localization)
+        public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger, ILocalizationManager localization, ILibraryManager libraryManager)
         {
             _logger = logger;
             _localization = localization;
+            _libraryManager = libraryManager;
             _config = Plugin.GetConfigurationSafe(_logger);
 
             var httpClientHandler = new HttpClientHandler
@@ -48,7 +54,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         {
             var result = new MetadataResult<Season>();
             _config = Plugin.GetConfigurationSafe(_logger);
-            if (ItemExclusion.IsExcluded(info.Path, _config))
+            if (ItemExclusion.IsExcluded(info.Path, _config) || IsParentSeriesExcluded(info))
             {
                 return result;
             }
@@ -191,6 +197,32 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             result.HasMetadata = true;
             _logger.LogInformation("Season metadata populated for {Name} S{SeasonNumber} with AniList ID {AniListId}", info.Name, seasonNumber, seasonDetail.AniListId);
             return result;
+        }
+
+        // A virtual season (one with no folder of its own) arrives with no path, so the path check
+        // alone can't tell that its series is excluded. Find the series by its AniList id instead;
+        // when several series share that id, only skip if every one of them is excluded.
+        private bool IsParentSeriesExcluded(SeasonInfo info)
+        {
+            if (!string.IsNullOrWhiteSpace(info.Path) || string.IsNullOrWhiteSpace(_config.ExcludedPaths))
+            {
+                return false;
+            }
+
+            if (info.SeriesProviderIds == null ||
+                !TryGetValueIgnoreCase(info.SeriesProviderIds, Constants.AniListProviderId, out var seriesAniListId))
+            {
+                return false;
+            }
+
+            var query = new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Series },
+                Recursive = true,
+                HasAnyProviderId = new Dictionary<string, string> { [Constants.AniListProviderId] = seriesAniListId }
+            };
+            var matches = _libraryManager.GetItemList(query).OfType<Series>().ToList();
+            return matches.Count > 0 && matches.All(series => ItemExclusion.IsExcluded(series.Path, _config));
         }
 
         public Task<IEnumerable<RemoteSearchResult>> GetSearchResults(SeasonInfo searchInfo, CancellationToken cancellationToken)
