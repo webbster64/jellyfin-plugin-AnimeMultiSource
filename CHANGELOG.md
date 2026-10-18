@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.7.0 - 2026-10-18
+Jellyfin 10.11 line (net9.0, ABI 10.11.3.0). Jellyfin 12 users should use 1.1.x. This release backports the fixes that don't depend on the Jellyfin version.
+- Fixed a crash on Fribb TMDb movie ids: Fribb now stores them as arrays (`{"movie": [372058]}`), which made metadata fail for any title whose mapping only had a movie id. A bare number, a numeric string and an array are all accepted now. Thanks to @doogalbeez (#19).
+- Fixed runtimes over an hour (Jikan's `1 hr 46 min`) being read as the minutes part only.
+- Fixed multi-minute stalls when Jikan (MAL) is down: requests now time out after 15 s, a 5xx counts as an outage instead of being retried with long backoffs, and after 3 failures in a row Jikan is skipped for 10 minutes (AniList data is used meanwhile).
+- New **Original Title Field** option: English title (#18, thanks @CommanderBubble).
+- New **Excluded folders** setting: skips metadata, artwork, upcoming episodes and tag refreshes for the listed folders, e.g. to stop a "One Pace" folder hammering AniDB. Also makes the Approved Genres box bigger (#20, thanks @Soitora).
+- Excluded folders now also apply to virtual seasons (seasons with no folder of their own), which previously still queried AniList for an excluded series.
+
 ## 1.0.6.14 - 2026-08-10
 - Fixed AnimeSchedule Upcoming skipping multi-season anime with a newer season not yet foldered locally (e.g. Re:Zero's part 4): now detects a confirmed next season via AniList's strict `SEQUEL` relation and creates the missing season/episodes for it.
 - Fixed a duplicate/`TBA`-episode bug caused by an unreliable episode lookup (`season.Children` instead of a real `GetEpisodes()` query).
