@@ -181,6 +181,9 @@ Action";
         public string AniDbClientName { get; set; }
         public string AniDbClientVersion { get; set; }
 
+        // Hours between automatic "Fill in missing anime metadata" runs; 0 = off (the default; "Fill in now" still works).
+        public int FillMissingIntervalHours { get; set; }
+
         // Season settings
         public SeasonTitleFormatType SeasonTitleFormat { get; set; }
         public SeasonOverviewSourceType SeasonOverviewSource { get; set; }

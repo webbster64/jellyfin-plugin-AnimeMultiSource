@@ -187,6 +187,27 @@
                         <div class="fieldDescription">This will prevent IP bans for requesting data too quickly.</div>
                     </div>
 
+                    <h2>Fill in missing metadata</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="fillMissingIntervalHours">Fill in automatically</label>
+                        <select is="emby-select" id="fillMissingIntervalHours" name="fillMissingIntervalHours" class="emby-select-withcolor emby-select">
+                            <option value="0">Off</option>
+                            <option value="3">Every 3 hours</option>
+                            <option value="6">Every 6 hours</option>
+                            <option value="12">Every 12 hours</option>
+                            <option value="24">Every 24 hours</option>
+                            <option value="72">Every 3 days</option>
+                            <option value="168">Every week</option>
+                        </select>
+                        <div class="fieldDescription">Refreshes shows and movies in libraries that use this plugin but still have no anime ids (added before the plugin was installed, or a lookup that failed during a scan). Only those items, one at a time, so it stays gentle on the APIs even for very large libraries. Titles that found no anime match are only retried by Fill in now.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <button is="emby-button" type="button" id="fillMissingNow" class="raised emby-button">
+                            <span>Fill in now</span>
+                        </button>
+                        <div class="fieldDescription" id="fillMissingNowStatus">Runs it right away, including titles that had no anime match before. Progress shows under Dashboard &gt; Scheduled Tasks, and a summary goes to Dashboard &gt; Activity.</div>
+                    </div>
+
                     <h2>Exclusions</h2>
                     <div class="inputContainer animeMultiSourceTextarea">
                         <label class="inputLabel inputLabelUnfocused" for="excludedPaths">Excluded folders</label>
@@ -252,6 +273,12 @@
                     ApiClient.getPluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId).then(function (config) {
                         // Title settings
                         document.getElementById('excludedPaths').value = config.ExcludedPaths || '';
+                        // A value that isn't in the list would leave the dropdown blank; show Off instead.
+                        var fillSelect = document.getElementById('fillMissingIntervalHours');
+                        fillSelect.value = String(config.FillMissingIntervalHours || 0);
+                        if (fillSelect.selectedIndex < 0) {
+                            fillSelect.value = '0';
+                        }
                         document.getElementById('useAnimeListsApi').checked = config.UseAnimeListsApi === true;
                         document.getElementById('titleField').value = config.TitleField || 'Title';
                         document.getElementById('titleDataSource').value = config.TitleDataSource || 'AniDB';
@@ -296,6 +323,7 @@
                         // Title settings
                         config.TitleField = document.getElementById('titleField').value;
                         config.ExcludedPaths = document.getElementById('excludedPaths').value;
+                        config.FillMissingIntervalHours = parseInt(document.getElementById('fillMissingIntervalHours').value || '0');
                         config.UseAnimeListsApi = document.getElementById('useAnimeListsApi').checked;
                         config.TitleDataSource = document.getElementById('titleDataSource').value;
 
@@ -337,6 +365,23 @@
 
             document.getElementById('AnimeMultiSourceConfigurationPage').addEventListener('pageshow', function () {
                 AnimeMultiSourceConfigurationPage.loadConfiguration();
+            });
+
+            document.getElementById('fillMissingNow').addEventListener('click', function () {
+                var status = document.getElementById('fillMissingNowStatus');
+                ApiClient.getScheduledTasks().then(function (tasks) {
+                    var task = tasks.find(function (t) { return t.Key === 'AnimeMultiSourceFillMissingNow'; });
+                    if (!task) {
+                        status.textContent = 'Task not found - restart Jellyfin after installing the plugin.';
+                        return;
+                    }
+
+                    return ApiClient.startScheduledTask(task.Id).then(function () {
+                        status.textContent = 'Started. Progress shows under Dashboard > Scheduled Tasks; a summary goes to Dashboard > Activity.';
+                    });
+                }).catch(function () {
+                    status.textContent = 'Could not start it; try Dashboard > Scheduled Tasks.';
+                });
             });
 
             document.getElementById('AnimeMultiSourceConfigurationForm').addEventListener('submit', function (e) {
