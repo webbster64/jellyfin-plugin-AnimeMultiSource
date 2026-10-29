@@ -53,6 +53,9 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         [JsonPropertyName("status")]
         public string? Status { get; set; }
 
+        [JsonPropertyName("studios")]
+        public AniListStudioConnection? Studios { get; set; }
+
         [JsonPropertyName("characters")]
         public AniListCharacterConnection? Characters { get; set; }
         
@@ -80,6 +83,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         [JsonPropertyName("bannerImage")]
         public string? BannerImage { get; set; }
+    }
+
+    public class AniListStudioConnection
+    {
+        [JsonPropertyName("nodes")]
+        public List<AniListStudio>? Nodes { get; set; }
+    }
+
+    public class AniListStudio
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
     }
 
     public class AniListCoverImage

@@ -192,7 +192,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 AniList = aniList,
                 ParentalRating = CleanRating(jikan?.Rating) ?? CleanRating(kitsuRating),
                 Genres = _apiService.CombineGenres(jikan, aniList, ApprovedGenres(config)),
-                Studios = _apiService.GetStudios(jikan),
+                Studios = _apiService.GetStudios(jikan, aniList),
                 RuntimeMinutes = PickRuntime(jikan, aniList, config.RuntimeDataSource)
             };
         }

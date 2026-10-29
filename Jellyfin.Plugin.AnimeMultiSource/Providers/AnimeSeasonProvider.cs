@@ -188,7 +188,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
             if (string.IsNullOrWhiteSpace(overview))
             {
-                overview = seasonDetail.Description;
+                overview = seasonDetail.Description != null ? AnimeMultiSourceService.StripAnimeScheduleHtml(seasonDetail.Description) : null;
             }
 
             var season = new Season

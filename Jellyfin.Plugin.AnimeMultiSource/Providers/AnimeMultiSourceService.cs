@@ -222,7 +222,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             metadata.ParentalRating = ChooseParentalRating(primaryJikan?.Rating)
                 ?? await _apiService.GetKitsuParentalRatingAsync(match.KitsuId);
             metadata.Genres = _apiService.CombineGenres(primaryJikan, aniList, GetApprovedGenres(config));
-            metadata.Studios = _apiService.GetStudios(jikan);
+            metadata.Studios = _apiService.GetStudios(jikan, aniList);
 
             try
             {
@@ -693,7 +693,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             metadata.CommunityRating = primaryJikan?.Score ?? (aniListPrimary?.AverageScore / 10.0);
 
             // Overview - prefer Jikan, fallback to AniList, then AnimeSchedule.net (when configured)
-            metadata.Overview = primaryJikan?.Synopsis ?? aniListPrimary?.Description;
+            metadata.Overview = primaryJikan?.Synopsis ?? (aniListPrimary?.Description != null ? StripAnimeScheduleHtml(aniListPrimary.Description) : null);
             if (string.IsNullOrWhiteSpace(metadata.Overview) && rootAniListId.HasValue)
             {
                 var scheduleDetail = await GetAnimeScheduleDetailAsync(config, rootAniListId.Value);
@@ -727,7 +727,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             metadata.Genres = _apiService.CombineGenres(primaryJikan, aniListData, approvedGenres);
 
             // Studios from Jikan
-            metadata.Studios = _apiService.GetStudios(jikanData);
+            metadata.Studios = _apiService.GetStudios(jikanData, aniListPrimary);
 
             // Fetch People data asynchronously
             if (rootAniListId.HasValue || mapping.mal_id.HasValue)
@@ -991,7 +991,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
         }
 
-        private static string StripAnimeScheduleHtml(string input)
+        internal static string StripAnimeScheduleHtml(string input)
         {
             var text = Regex.Replace(input, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
             text = Regex.Replace(text, "<.*?>", string.Empty);

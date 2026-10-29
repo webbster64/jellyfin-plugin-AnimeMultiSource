@@ -47,6 +47,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private static readonly object PersistentCacheLock = new();
         private static bool _persistentCacheLoaded;
         private static string? _persistentCachePath;
+        private static DateTimeOffset _lastPersist = DateTimeOffset.MinValue;
+        private static readonly TimeSpan PersistInterval = TimeSpan.FromMinutes(1);
         private static readonly JsonSerializerOptions CacheSerializerOptions = new()
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -253,6 +255,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 query ($id: Int) {
                     Media(id: $id, type: ANIME) {
                         id idMal format duration averageScore genres description status
+                        studios(isMain: true) { nodes { name } }
                         title { romaji english native }
                         synonyms
                         startDate { year month day }
@@ -321,6 +324,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                             genres
                             duration
                             averageScore
+                            studios(isMain: true) { nodes { name } }
                             startDate {
                                 year
                                 month
@@ -431,6 +435,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                         genres
                         duration
                         averageScore
+                        studios(isMain: true) { nodes { name } }
                         startDate { year month day }
                         endDate { year month day }
                         status
@@ -821,16 +826,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return allGenres.Distinct().ToList();
         }
 
-        public List<string> GetStudios(JikanAnime? jikanData)
+        // Jikan's studios, or AniList's main studio when Jikan has none (or is paused).
+        public List<string> GetStudios(JikanAnime? jikanData, AniListMedia? aniListData)
         {
-            var studios = new List<string>();
-
-            if (jikanData?.Studios != null)
-            {
-                studios.AddRange(jikanData.Studios.Select(s => s.Name).Where(name => !string.IsNullOrEmpty(name))!);
-            }
-
-            return studios.Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
+            var jikanStudios = (jikanData?.Studios ?? new()).Select(s => s.Name);
+            var aniListStudios = (aniListData?.Studios?.Nodes ?? new()).Select(s => s.Name);
+            var studios = jikanStudios.Any(n => !string.IsNullOrWhiteSpace(n)) ? jikanStudios : aniListStudios;
+            return studios.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         public async Task<List<PersonInfo>> GetPeopleAsync(long anilistId, long malId)
@@ -1880,6 +1882,20 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         private void PersistCachesToDiskSafe()
         {
+            // shortcut: saves at most once a minute, so up to a minute of new entries is lost on a crash
+            // or shutdown (they're simply fetched again). Rewriting the whole file after every reply
+            // meant thousands of multi-MB writes during a large library's first scan.
+            lock (PersistentCacheLock)
+            {
+                var now = DateTimeOffset.UtcNow;
+                if (now - _lastPersist < PersistInterval)
+                {
+                    return;
+                }
+
+                _lastPersist = now;
+            }
+
             try
             {
                 PersistCachesToDisk();
@@ -1922,8 +1938,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     Directory.CreateDirectory(directory);
                 }
 
-                var json = JsonSerializer.Serialize(snapshot, CacheSerializerOptions);
-                File.WriteAllText(path, json);
+                // Through a temporary file, so a crash mid-write never leaves a broken cache behind.
+                var temp = path + ".tmp";
+                File.WriteAllText(temp, JsonSerializer.Serialize(snapshot, CacheSerializerOptions));
+                File.Move(temp, path, overwrite: true);
                 _logger.LogDebug("Persistent cache saved to {Path}", path);
             }
         }
