@@ -79,7 +79,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 movie.Genres = metadata.Genres?.ToArray() ?? Array.Empty<string>();
                 movie.Studios = metadata.Studios?.ToArray() ?? Array.Empty<string>();
-                movie.Tags = metadata.Tags?.ToArray() ?? Array.Empty<string>();
+                movie.Tags = AnimeMultiSourceProvider.WithBadge(metadata.Tags, config);
 
                 var tagCount = metadata.Tags?.Count ?? 0;
                 if (tagCount > 0)

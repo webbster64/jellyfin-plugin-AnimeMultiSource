@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -98,7 +99,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
                 // Set tags
                 if (metadata.Tags != null)
-                    result.Item.Tags = metadata.Tags.ToArray();
+                    result.Item.Tags = WithBadge(metadata.Tags, config);
 
                 // Store AMS score (tag count) as a provider ID so it doesn't alter the displayed rating.
                 var amsScore = metadata.Tags?.Count ?? 0;
@@ -220,6 +221,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 _logger.LogError(ex, "Error searching for series '{Name}'", searchInfo.Name);
                 return new List<RemoteSearchResult>();
             }
+        }
+
+        // The item's tags plus the "Anime Multi Source" badge when it's turned on (series and movies).
+        internal static string[] WithBadge(List<string>? tags, Configuration.PluginConfiguration config)
+        {
+            var result = (tags ?? new List<string>()).Where(t => !string.Equals(t, Constants.BadgeTag, StringComparison.OrdinalIgnoreCase));
+            return config.AddBadgeTag ? result.Append(Constants.BadgeTag).ToArray() : result.ToArray();
         }
 
         public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)

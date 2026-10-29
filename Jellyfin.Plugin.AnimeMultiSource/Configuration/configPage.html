@@ -181,6 +181,14 @@
                         <div class="fieldDescription">Prefilled with a curated list; one genre per line. Genres from Jikan (themes+genres+explicit_genres+demographics) and Anilist will be combined and filtered by this list.</div>
                     </div>
 
+                    <div class="checkboxContainer">
+                        <label>
+                            <input id="addBadgeTag" name="addBadgeTag" type="checkbox" is="emby-checkbox" />
+                            <span>Add an "Anime Multi Source" tag to shows and movies it updates</span>
+                        </label>
+                        <div class="fieldDescription">Shows which items this plugin filled in: the tag is listed under Tags on the item's page and works as a library filter. Added or removed on an item's next metadata refresh.</div>
+                    </div>
+
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="chkAniDbRateLimit">AniDB Rate Limit</label>
                         <input id="chkAniDbRateLimit" name="chkAniDbRateLimit" type="number" is="emby-input" min="0" />
@@ -277,6 +285,7 @@
 
                         // Genres
                         document.getElementById('approvedGenres').value = config.ApprovedGenres || '';
+                        document.getElementById('addBadgeTag').checked = config.AddBadgeTag === true;
 
                         // Limits
                         document.getElementById('chkAniDbRateLimit').value = config.AniDbRateLimit;
@@ -320,6 +329,7 @@
 
                         // Genres
                         config.ApprovedGenres = document.getElementById('approvedGenres').value;
+                        config.AddBadgeTag = document.getElementById('addBadgeTag').checked;
 
                         // Limits
                         config.AniDbRateLimit = document.getElementById('chkAniDbRateLimit').value;

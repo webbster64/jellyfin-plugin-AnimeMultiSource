@@ -176,6 +176,9 @@ Action";
         // Genres
         public string ApprovedGenres { get; set; }
 
+        // Adds the "Anime Multi Source" tag to every show and movie this plugin updates. Off by default.
+        public bool AddBadgeTag { get; set; }
+
         // AniDB properties
         public bool EnableAniDbTags { get; set; }
         public string AniDbClientName { get; set; }
