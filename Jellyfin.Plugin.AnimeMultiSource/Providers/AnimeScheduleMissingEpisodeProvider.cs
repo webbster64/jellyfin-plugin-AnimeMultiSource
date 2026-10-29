@@ -29,6 +29,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             ILocalizationManager localization,
             ILogger<AnimeScheduleMissingEpisodeProvider> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _providerManager = providerManager;
             _updater = new AnimeScheduleUpcomingEpisodeUpdater(libraryManager, localization, logger);
         }

@@ -28,6 +28,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public AnimeMultiSourceMovieFanartProvider(ILogger<AnimeMultiSourceMovieFanartProvider> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _logger = logger;
             _config = Plugin.GetConfigurationSafe(_logger);
 

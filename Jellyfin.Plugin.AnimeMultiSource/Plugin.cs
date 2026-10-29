@@ -31,7 +31,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
-            _logger = logger;
+            PluginLog.Directory = applicationPaths.LogDirectoryPath;
+            _logger = PluginLog.Wrap(logger);
 
             // Order matters: read the user's settings before anything else can touch the file (see PluginSettingsStore).
             LoadSettingsOurselves();

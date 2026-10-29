@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public TvdbEpisodeProvider(ILogger<TvdbEpisodeProvider> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _logger = logger;
             var handler = new HttpClientHandler
             {

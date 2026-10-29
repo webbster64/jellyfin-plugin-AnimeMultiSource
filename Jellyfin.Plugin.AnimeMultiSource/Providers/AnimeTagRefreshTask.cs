@@ -38,6 +38,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             IDirectoryService directoryService,
             ILogger<AnimeTagRefreshTask> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _libraryManager = libraryManager;
             _providerManager = providerManager;
             _directoryService = directoryService;

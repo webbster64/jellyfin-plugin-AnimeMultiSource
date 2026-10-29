@@ -34,6 +34,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public AnimeSeasonProvider(ILogger<AnimeSeasonProvider> logger, ILocalizationManager localization, ILibraryManager libraryManager)
         {
+            logger = PluginLog.Wrap(logger);
             _logger = logger;
             _localization = localization;
             _libraryManager = libraryManager;

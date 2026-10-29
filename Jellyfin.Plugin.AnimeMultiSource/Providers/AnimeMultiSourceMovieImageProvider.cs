@@ -25,6 +25,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public AnimeMultiSourceMovieImageProvider(ILogger<AnimeMultiSourceMovieImageProvider> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _logger = logger;
 
             var handler = new HttpClientHandler

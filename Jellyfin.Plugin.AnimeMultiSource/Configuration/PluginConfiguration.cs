@@ -197,5 +197,8 @@ Action";
         // AnimeSchedule.net
         public string AnimeScheduleApiKey { get; set; }
         public AnimeScheduleModeType AnimeScheduleMode { get; set; }
+
+        // Level of the plugin's own log file (AnimeMultiSource_yyyy-MM-dd.log): false = Info, true = Debug.
+        public bool DebugLogging { get; set; }
     }
 }

@@ -208,6 +208,16 @@
                         <p class="animeMultiSourceNote"><strong>What is sent:</strong> the folder name and year of each movie or series being identified, plus anime ids (AniList, MAL, TVDB, TMDb) to look up their details. The server is run by the plugin author. Its logs hold only the searched title and how the request went; they contain no IP address, device id or token.</p>
                     </div>
 
+                    <h2>Logging</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="logLevel">Plugin log level</label>
+                        <select is="emby-select" id="logLevel" name="logLevel" class="emby-select-withcolor emby-select">
+                            <option value="info">Info (recommended)</option>
+                            <option value="debug">Debug</option>
+                        </select>
+                        <div class="fieldDescription">The plugin also writes its own log, AnimeMultiSource_YYYY-MM-DD.log, under Dashboard &gt; Logs (kept 7 days). Debug adds every API call and match decision, for tracking down a wrong or missing match, without editing Jellyfin's logging.json. Jellyfin's main log is not affected.</div>
+                    </div>
+
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
@@ -285,6 +295,9 @@
                         document.getElementById('animeScheduleApiKey').value = config.AnimeScheduleApiKey || '';
                         document.getElementById('animeScheduleMode').value = config.AnimeScheduleMode || 'Combined';
 
+                        // Logging
+                        document.getElementById('logLevel').value = config.DebugLogging ? 'debug' : 'info';
+
                         Dashboard.hideLoadingMsg();
                     });
                 },
@@ -327,6 +340,9 @@
                         // AnimeSchedule.net
                         config.AnimeScheduleApiKey = document.getElementById('animeScheduleApiKey').value;
                         config.AnimeScheduleMode = document.getElementById('animeScheduleMode').value;
+
+                        // Logging
+                        config.DebugLogging = document.getElementById('logLevel').value === 'debug';
 
                         ApiClient.updatePluginConfiguration(AnimeMultiSourceConfigurationPage.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);

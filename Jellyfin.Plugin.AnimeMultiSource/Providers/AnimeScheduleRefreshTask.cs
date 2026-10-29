@@ -24,6 +24,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public AnimeScheduleRefreshTask(ILibraryManager libraryManager, ILocalizationManager localization, ILogger<AnimeScheduleRefreshTask> logger)
         {
+            logger = PluginLog.Wrap(logger);
             _libraryManager = libraryManager;
             _logger = logger;
             _updater = new AnimeScheduleUpcomingEpisodeUpdater(libraryManager, localization, logger);
