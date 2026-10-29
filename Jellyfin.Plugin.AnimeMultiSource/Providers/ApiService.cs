@@ -38,6 +38,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         private static int _aniListWindowCount;
         private static DateTimeOffset _aniListWindowStart = DateTimeOffset.UtcNow;
         private const int AniListMaxPerMinute = 30;
+        private const int AniListTagMinRank = 60;
         private static readonly TimeSpan AniListCacheDuration = TimeSpan.FromDays(5);
         private static readonly ConcurrentDictionary<int, AniListCacheEntry<AniListMedia>> _aniListMediaCache = new();
         private static readonly ConcurrentDictionary<int, AniListCacheEntry<AniListSeasonDetail>> _aniListSeasonCache = new();
@@ -254,6 +255,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                     Media(id: $id, type: ANIME) {
                         id idMal format duration averageScore genres description status
                         title { romaji english native }
+                        tags { name rank isMediaSpoiler isGeneralSpoiler }
                         synonyms
                         startDate { year month day }
                         endDate { year month day }
@@ -290,6 +292,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         }
 
 
+        // Tags come from AniDB. When AniDB has none for a title (no AniDB id in the mapping, or AniDB
+        // paused), AniList's tags stand in: only ones its users rank at least 60% relevant, never spoilers,
+        // through the same tag filter.
+        public List<string> GetAniListTags(IEnumerable<AniListTag>? tags)
+        {
+            var names = (tags ?? Enumerable.Empty<AniListTag>())
+                .Where(t => t.Rank >= AniListTagMinRank && !t.IsMediaSpoiler && !t.IsGeneralSpoiler && !string.IsNullOrWhiteSpace(t.Name))
+                .Select(t => t.Name!)
+                .ToList();
+            return _tagFilterService.FilterTags(names);
+        }
+
         public async Task<AniListMedia?> GetAniListAnimeAsync(long anilistId)
         {
             try
@@ -318,6 +332,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                                 native
                             }
                             description
+                            tags { name rank isMediaSpoiler isGeneralSpoiler }
                             genres
                             duration
                             averageScore
@@ -428,6 +443,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                             native
                         }
                         description
+                        tags { name rank isMediaSpoiler isGeneralSpoiler }
                         genres
                         duration
                         averageScore

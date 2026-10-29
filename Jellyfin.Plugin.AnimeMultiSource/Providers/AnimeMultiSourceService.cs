@@ -237,8 +237,8 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             }
 
             // AniDB models some film series as one entry (Initial D Legend 1-3 share AniDB 9987); they share its tags.
-            metadata.Tags = config.EnableAniDbTags && aniDbId.HasValue
-                ? await GetAniDbTagsForMovieAsync(aniDbId.Value, config)
+            metadata.Tags = config.EnableAniDbTags
+                ? WithAniListTagFallback(aniDbId.HasValue ? await GetAniDbTagsForMovieAsync(aniDbId.Value, config) : new List<string>(), aniList, metadata.Title)
                 : new List<string>();
 
             _logger.LogInformation(
@@ -764,7 +764,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             // Fetch tags from AniDB if enabled and we have an AniDB ID
             if (config.EnableAniDbTags)
             {
-                metadata.Tags = await GetAggregatedAniDbTagsAsync(mapping, metadata.Seasons, config);
+                metadata.Tags = WithAniListTagFallback(await GetAggregatedAniDbTagsAsync(mapping, metadata.Seasons, config), aniListPrimary, metadata.Title);
             }
             else
             {
@@ -775,6 +775,22 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 metadata.Title, metadata.Genres?.Count ?? 0, metadata.Studios?.Count ?? 0, metadata.People?.Count ?? 0, metadata.Tags?.Count ?? 0);
 
             return metadata;
+        }
+
+        private List<string> WithAniListTagFallback(List<string> aniDbTags, AniListMedia? aniListData, string? title)
+        {
+            if (aniDbTags.Count > 0)
+            {
+                return aniDbTags;
+            }
+
+            var aniListTags = _apiService.GetAniListTags(aniListData?.Tags);
+            if (aniListTags.Count > 0)
+            {
+                _logger.LogInformation("No AniDB tags for {Title}; using {Count} AniList tags instead", title, aniListTags.Count);
+            }
+
+            return aniListTags;
         }
 
         private async Task<List<string>> GetAggregatedAniDbTagsAsync(

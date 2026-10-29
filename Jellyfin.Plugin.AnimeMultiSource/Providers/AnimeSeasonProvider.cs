@@ -286,10 +286,11 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 result.People = details.People;
             }
 
-            // Tags come from AniDB only, through the same filter as the show.
+            // Tags come from AniDB, through the same filter as the show; AniList's tags when AniDB has none.
             if (_config.EnableAniDbTags && tagsAniListId is long id && id <= int.MaxValue)
             {
-                season.Tags = (await GetSeasonTagsAsync((int)id)).ToArray();
+                var tags = await GetSeasonTagsAsync((int)id);
+                season.Tags = (tags.Count > 0 ? tags : _apiService.GetAniListTags(details.AniList?.Tags)).ToArray();
             }
         }
 

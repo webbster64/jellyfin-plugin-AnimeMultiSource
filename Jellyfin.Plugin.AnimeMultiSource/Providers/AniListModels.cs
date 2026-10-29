@@ -26,6 +26,10 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
         [JsonPropertyName("description")]
         public string? Description { get; set; }
 
+        // Fallback tags when AniDB has none for a title (see ApiService.GetAniListTags).
+        [JsonPropertyName("tags")]
+        public List<AniListTag>? Tags { get; set; }
+
         [JsonPropertyName("genres")]
         public List<string>? Genres { get; set; }
 
@@ -257,5 +261,21 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         [JsonPropertyName("seasonYear")]
         public int? SeasonYear { get; set; }
+    }
+
+    public class AniListTag
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        // How relevant AniList's users rate the tag for this title, 0-100.
+        [JsonPropertyName("rank")]
+        public int? Rank { get; set; }
+
+        [JsonPropertyName("isMediaSpoiler")]
+        public bool IsMediaSpoiler { get; set; }
+
+        [JsonPropertyName("isGeneralSpoiler")]
+        public bool IsGeneralSpoiler { get; set; }
     }
 }
