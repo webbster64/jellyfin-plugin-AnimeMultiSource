@@ -33,10 +33,12 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
         public string? EnglishTitle { get; set; }
 
-        /// <summary>How it was identified: plexmatch, existing-id, api, anilist-search.</summary>
+        /// <summary>How it was identified: plexmatch, existing-id, api, anilist-search, existing-id-provider-ids.</summary>
         public string Method { get; set; } = string.Empty;
 
         public double Score { get; set; }
+
+        public long? TvdbId { get; set; }
     }
 
     /// <summary>
@@ -260,28 +262,44 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 return null;
             }
 
-            long? aniList = null, mal = null;
-            if (TryGetId(info.ProviderIds, Constants.AniListProviderId, out var a))
+            long? aniList = null, mal = null, aniDb = null, tvdb = null;
+            foreach (var pair in info.ProviderIds)
             {
-                aniList = a;
+                if (!long.TryParse(pair.Value, out var value) || value <= 0)
+                {
+                    continue;
+                }
+
+                if (string.Equals(pair.Key, Constants.AniListProviderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    aniList = value;
+                }
+                else if (string.Equals(pair.Key, Constants.MalProviderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    mal = value;
+                }
+                else if (string.Equals(pair.Key, Constants.AniDbProviderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    aniDb = value;
+                }
+                else if (string.Equals(pair.Key, "Tvdb", StringComparison.OrdinalIgnoreCase) || 
+                         string.Equals(pair.Key, "TheTVDB", StringComparison.OrdinalIgnoreCase))
+                {
+                    tvdb = value;
+                }
             }
 
-            if (TryGetId(info.ProviderIds, Constants.MalProviderId, out var m))
+            // If we have AniList or MAL id, return immediately
+            if (aniList.HasValue || mal.HasValue)
             {
-                mal = m;
+                long? kitsu = TryGetId(info.ProviderIds, Constants.KitsuProviderId, out var k) ? k : null;
+                _logger.LogDebug("Movie '{Name}' already has AniList {AniList} / MAL {Mal}; using it", info.Name, aniList, mal);
+                return new MovieMatch { AniListId = aniList, MalId = mal, KitsuId = kitsu, Method = "existing-id", Score = 1.0 };
             }
 
-            if (!aniList.HasValue && !mal.HasValue)
-            {
-                return null;
-            }
-
-            // A stored Kitsu id is kept so the parental-rating fallback still works for films the API cannot complete.
-            // (AniDB/TMDb/IMDb are not carried over: they are re-read from the API so a wrong stored one cannot linger.)
-            long? kitsu = TryGetId(info.ProviderIds, Constants.KitsuProviderId, out var k) ? k : null;
-
-            _logger.LogDebug("Movie '{Name}' already has AniList {AniList} / MAL {Mal}; using it", info.Name, aniList, mal);
-            return new MovieMatch { AniListId = aniList, MalId = mal, KitsuId = kitsu, Method = "existing-id", Score = 1.0 };
+            // No AniList/MAL id, but we have AniDB or TVDB - return a match with those ids so the service can resolve them
+            _logger.LogDebug("Movie '{Name}' has existing AniDB {AniDb} / TVDB {Tvdb}; deferring resolution", info.Name, aniDb, tvdb);
+            return new MovieMatch { AniListId = null, MalId = null, AniDbId = aniDb, TvdbId = tvdb, Method = "existing-id-provider-ids", Score = 1.0 };
         }
 
         private async Task<MovieMatch?> MatchFromPlexMatchAsync(PlexMatchData plex, string? name, PluginConfiguration config, CancellationToken cancellationToken)

@@ -155,6 +155,33 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 return null;
             }
 
+            // Resolve AniDB/TVDB provider IDs to an AniList ID if the match has them but no AniList/MAL id
+            if (!match.AniListId.HasValue && !match.MalId.HasValue && (match.AniDbId.HasValue || match.TvdbId.HasValue))
+            {
+                await _animeListMapper.LoadAnimeListsAsync();
+                
+                long? resolvedAniListId = null;
+                if (match.TvdbId.HasValue)
+                {
+                    var mapping = _manualMappings.FirstOrDefault(m => m.TvdbId.HasValue && m.TvdbId.Value == match.TvdbId.Value)
+                        ?? _animeListMapper.GetMappingByTvdbId(match.TvdbId.Value.ToString());
+                    resolvedAniListId = mapping?.anilist_id;
+                }
+
+                if (!resolvedAniListId.HasValue && match.AniDbId.HasValue)
+                {
+                    var mapping = _manualMappings.FirstOrDefault(m => m.anidb_id == match.AniDbId.Value)
+                        ?? _animeListMapper.GetMappingByAniDbId(match.AniDbId.Value);
+                    resolvedAniListId = mapping?.anilist_id;
+                }
+
+                if (resolvedAniListId.HasValue)
+                {
+                    _logger.LogInformation("Resolved movie '{Name}' AniDB {AniDbId}/TVDB {TvdbId} to AniList {AniListId}", info.Name, match.AniDbId, match.TvdbId, resolvedAniListId);
+                    match.AniListId = resolvedAniListId;
+                }
+            }
+
             AniListMovieMedia? aniList = match.AniListId.HasValue
                 ? await _apiService.GetAniListMovieMediaAsync(match.AniListId.Value)
                 : null;
