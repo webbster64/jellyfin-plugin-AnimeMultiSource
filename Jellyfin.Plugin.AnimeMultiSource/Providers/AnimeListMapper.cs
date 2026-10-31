@@ -192,6 +192,16 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             return _mappingsByMal.TryGetValue(malId, out var mapping) ? mapping : null;
         }
 
+        public AnimeMapping? GetMappingByAniDbId(long aniDbId)
+        {
+            // Fribb mappings are indexed by tvdb/imdb/anilist/mal - AniDB is backfilled via the offline database.
+            // Scan for a mapping that has this anidb_id.
+            return _mappingsByTvdb.Values.FirstOrDefault(m => m.anidb_id == aniDbId)
+                ?? _mappingsByImdb.Values.FirstOrDefault(m => m.anidb_id == aniDbId)
+                ?? _mappingsByAniList.Values.FirstOrDefault(m => m.anidb_id == aniDbId)
+                ?? _mappingsByMal.Values.FirstOrDefault(m => m.anidb_id == aniDbId);
+        }
+
         private AnimeMapping SelectPreferredMapping(IEnumerable<AnimeMapping> group)
         {
             return group

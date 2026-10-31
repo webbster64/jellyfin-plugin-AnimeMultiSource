@@ -27,7 +27,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
 
     /// <summary>
     /// Identifies a series that has no .plexmatch file (a .plexmatch is always read first, by the caller). Order:
-    /// 1. an AniList/MAL id the item already carries (stored earlier, or chosen with "Identify"),
+    /// 1. an AniList/MAL/AniDB/TVDB id the item already carries (stored earlier, or chosen with "Identify"),
     /// 2. the anime-lists API title search - the only place ids are searched for.
     /// It refuses rather than guesses when two unrelated entries are too close to call.
     /// </summary>
@@ -217,7 +217,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 return null;
             }
 
-            long? aniList = null, mal = null;
+            long? aniList = null, mal = null, aniDb = null, tvdb = null;
             foreach (var pair in ids)
             {
                 if (!long.TryParse(pair.Value, out var value) || value <= 0)
@@ -233,9 +233,18 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 {
                     mal = value;
                 }
+                else if (string.Equals(pair.Key, Constants.AniDbProviderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    aniDb = value;
+                }
+                else if (string.Equals(pair.Key, "Tvdb", StringComparison.OrdinalIgnoreCase) || 
+                         string.Equals(pair.Key, "TheTVDB", StringComparison.OrdinalIgnoreCase))
+                {
+                    tvdb = value;
+                }
             }
 
-            return aniList.HasValue || mal.HasValue
+            return aniList.HasValue || mal.HasValue || aniDb.HasValue || tvdb.HasValue
                 ? new SeriesAnchor { AniListId = aniList, MalId = mal, Method = "existing-id", Title = title, Year = year }
                 : null;
         }

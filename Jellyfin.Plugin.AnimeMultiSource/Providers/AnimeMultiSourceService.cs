@@ -155,6 +155,33 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 return null;
             }
 
+            // Resolve AniDB/TVDB provider IDs to an AniList ID if the match has them but no AniList/MAL id
+            if (!match.AniListId.HasValue && !match.MalId.HasValue && (match.AniDbId.HasValue || match.TvdbId.HasValue))
+            {
+                await _animeListMapper.LoadAnimeListsAsync();
+                
+                long? resolvedAniListId = null;
+                if (match.TvdbId.HasValue)
+                {
+                    var mapping = _manualMappings.FirstOrDefault(m => m.TvdbId.HasValue && m.TvdbId.Value == match.TvdbId.Value)
+                        ?? _animeListMapper.GetMappingByTvdbId(match.TvdbId.Value.ToString());
+                    resolvedAniListId = mapping?.anilist_id;
+                }
+
+                if (!resolvedAniListId.HasValue && match.AniDbId.HasValue)
+                {
+                    var mapping = _manualMappings.FirstOrDefault(m => m.anidb_id == match.AniDbId.Value)
+                        ?? _animeListMapper.GetMappingByAniDbId(match.AniDbId.Value);
+                    resolvedAniListId = mapping?.anilist_id;
+                }
+
+                if (resolvedAniListId.HasValue)
+                {
+                    _logger.LogInformation("Resolved movie '{Name}' AniDB {AniDbId}/TVDB {TvdbId} to AniList {AniListId}", info.Name, match.AniDbId, match.TvdbId, resolvedAniListId);
+                    match.AniListId = resolvedAniListId;
+                }
+            }
+
             AniListMovieMedia? aniList = match.AniListId.HasValue
                 ? await _apiService.GetAniListMovieMediaAsync(match.AniListId.Value)
                 : null;
@@ -349,13 +376,26 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 var anchor = await _seriesIdentifier.IdentifyAsync(info, config, cancellationToken);
                 if (anchor == null)
                 {
-                    _logger.LogWarning("Series '{Name}' has no .plexmatch file and could not be identified from its name; skipping", info.Name);
-                    return null;
+                    // Check existing provider IDs (AniDB/TVDB) before giving up when API is off
+                    var existingMapping = ResolveMappingFromProviderIds(info.ProviderIds);
+                    if (existingMapping != null)
+                    {
+                        _logger.LogInformation("Series '{Name}' has no .plexmatch and anime-lists API is off, but resolved via provider IDs (AniDB/TVDB)", info.Name);
+                        plexMatchData = new PlexMatchData { Title = info.Name, Year = info.Year };
+                        // Skip the rest of identify flow and use existingMapping directly below
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Series '{Name}' has no .plexmatch file and could not be identified from its name or provider IDs; skipping", info.Name);
+                        return null;
+                    }
                 }
-
-                _logger.LogInformation("No .plexmatch for '{Name}'; identified via {Method} (AniList {AniListId}, MAL {MalId})",
-                    info.Name, anchor.Method, anchor.AniListId, anchor.MalId);
-                plexMatchData = new PlexMatchData { Title = anchor.Title, Year = anchor.Year, AniListId = anchor.AniListId, MalId = anchor.MalId };
+                else
+                {
+                    _logger.LogInformation("No .plexmatch for '{Name}'; identified via {Method} (AniList {AniListId}, MAL {MalId})",
+                        info.Name, anchor.Method, anchor.AniListId, anchor.MalId);
+                    plexMatchData = new PlexMatchData { Title = anchor.Title, Year = anchor.Year, AniListId = anchor.AniListId, MalId = anchor.MalId };
+                }
             }
 
             _logger.LogInformation("Parsed .plexmatch data - Title: {Title}, Year: {Year}, TVDB: {TvdbId}, IMDb: {ImdbId}",
@@ -364,9 +404,13 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             // Ensure anime lists are loaded
             await _animeListMapper.LoadAnimeListsAsync();
 
-            // Find mapping
+            // Find mapping from .plexmatch or existing provider IDs
             AnimeMapping? mapping = null;
-            if (!string.IsNullOrEmpty(plexMatchData.TvdbId))
+            
+            // Try to resolve from existing provider IDs first (AniDB, TVDB)
+            mapping = ResolveMappingFromProviderIds(info.ProviderIds);
+            
+            if (mapping == null && !string.IsNullOrEmpty(plexMatchData.TvdbId))
             {
                 mapping = _manualMappings.FirstOrDefault(m => m.TvdbId.HasValue && m.TvdbId.Value.ToString() == plexMatchData.TvdbId)
                     ?? _animeListMapper.GetMappingByTvdbId(plexMatchData.TvdbId);
@@ -1106,6 +1150,51 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
                 Configuration.OriginalTitleFieldType.TitleJapanese => aniListData.Title.Native,
                 _ => aniListData.Title.Native
             };
+        }
+
+        /// <summary>Resolves a mapping from existing provider IDs (AniDB, TVDB) without requiring the anime-lists API.</summary>
+        private AnimeMapping? ResolveMappingFromProviderIds(IDictionary<string, string>? providerIds)
+        {
+            if (providerIds == null) return null;
+
+            long? aniDbId = null;
+            long? tvdbId = null;
+
+            foreach (var pair in providerIds)
+            {
+                if (!long.TryParse(pair.Value, out var value) || value <= 0)
+                {
+                    continue;
+                }
+
+                if (string.Equals(pair.Key, Constants.AniDbProviderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    aniDbId = value;
+                }
+                else if (string.Equals(pair.Key, "Tvdb", StringComparison.OrdinalIgnoreCase) || 
+                         string.Equals(pair.Key, "TheTVDB", StringComparison.OrdinalIgnoreCase))
+                {
+                    tvdbId = value;
+                }
+            }
+
+            AnimeMapping? mapping = null;
+            
+            // Try TVDB first (has direct lookup in mapper)
+            if (tvdbId.HasValue)
+            {
+                mapping = _manualMappings.FirstOrDefault(m => m.TvdbId.HasValue && m.TvdbId.Value == tvdbId.Value)
+                    ?? _animeListMapper.GetMappingByTvdbId(tvdbId.Value.ToString());
+            }
+
+            // If no TVDB mapping and we have AniDB, try to find via manual mappings or the mapper
+            if (mapping == null && aniDbId.HasValue)
+            {
+                mapping = _manualMappings.FirstOrDefault(m => m.anidb_id == aniDbId.Value)
+                    ?? _animeListMapper.GetMappingByAniDbId(aniDbId.Value);
+            }
+
+            return mapping;
         }
     }
 }
