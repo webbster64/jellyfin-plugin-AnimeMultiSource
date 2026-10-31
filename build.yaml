@@ -1,5 +1,5 @@
 ---
-name: "AnimeMultiSource (Anilist fix)"
+name: "AnimeMultiSource"
 guid: "8eca6f17-71fe-4309-a670-3cae083f22bd"
 version: "1.0.1.1"
 targetAbi: "12.0.0.0"
