@@ -1157,7 +1157,7 @@ namespace Jellyfin.Plugin.AnimeMultiSource.Providers
             if (tvdbId.HasValue)
             {
                 mapping = _manualMappings.FirstOrDefault(m => m.TvdbId.HasValue && m.TvdbId.Value == tvdbId.Value)
-                    ?? _animeListMapper.GetMappingByTvdbId(tvdbId.ToString());
+                    ?? _animeListMapper.GetMappingByTvdbId(tvdbId.Value.ToString());
             }
 
             // If no TVDB mapping and we have AniDB, try to find via manual mappings or the mapper
